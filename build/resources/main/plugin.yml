@@ -1,0 +1,4 @@
+name: onemace
+version: '1.0'
+main: net.mattwhyy.onemace.OneMace
+api-version: '1.21'

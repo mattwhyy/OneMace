@@ -1,0 +1,4 @@
+settings:
+  # If true, the server will announce when the first Mace is crafted - "§8[OneMace]§r §5§lThe Mace has been crafted!"
+  # Set to false to disable this message.
+  announce-mace-craft: true
