@@ -1,6 +1,6 @@
 [Modrinth](https://modrinth.com/plugin/onemace) | [CurseForge](https://curseforge.com/minecraft/bukkit-plugins/onemace) | [Discord](https://discordapp.com/users/555629040455909406) | [GitHub](https://github.com/mattwhyy/OneMace)
 
-![project version](https://img.shields.io/modrinth/v/onemace) ![game versions](https://img.shields.io/modrinth/game-versions/onemace?color=orange) ![project downloads](https://img.shields.io/modrinth/dt/onemace)
+![project version](https://img.shields.io/modrinth/v/onemace) ![game versions](https://img.shields.io/modrinth/game-versions/onemace?color=yellow) ![project downloads](https://img.shields.io/modrinth/dt/onemace) ![platforms](https://img.shields.io/badge/build-bukkit%20paper%20spigot%20purpur-brightgreen?style=flat&label=platforms&color=purple)
 # OneMace
 **OneMace** introduces a unique gameplay twist by limiting the **entire server** to a **single Mace**. No more spamming Maces—strategy and skill are key! Perfect for **Lifesteal** and **competitive** **PvP** servers that want to balance the game.
 
