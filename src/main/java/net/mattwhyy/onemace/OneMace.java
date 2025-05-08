@@ -184,7 +184,7 @@ public class OneMace extends JavaPlugin implements Listener {
     }
 
     private boolean isAnimalStorage(org.bukkit.event.inventory.InventoryClickEvent event) {
-        return event.getInventory().getHolder() instanceof org.bukkit.entity.AbstractHorse; // Includes Donkeys, Mules, and Llamas
+        return event.getInventory().getHolder() instanceof org.bukkit.entity.AbstractHorse;
     }
 
 
@@ -383,7 +383,7 @@ public class OneMace extends JavaPlugin implements Listener {
 
     public void saveMaceOwner(UUID ownerUUID) {
         if (ownerUUID == null) {
-            getConfig().set("settings.mace-owner", null); // Remove UUID from config
+            getConfig().set("settings.mace-owner", null);
         } else {
             getConfig().set("settings.mace-owner", ownerUUID.toString());
         }
@@ -404,7 +404,6 @@ public class OneMace extends JavaPlugin implements Listener {
     public void resetMaceCrafting() {
         maceCrafted = false;
         getConfig().set("settings.mace-crafted", false);
-        // Clear all offline tracking
         getConfig().set("offline_inventory", null);
         saveConfig();
 
@@ -421,8 +420,8 @@ public class OneMace extends JavaPlugin implements Listener {
     private void addVanillaMaceRecipe() {
         NamespacedKey vanillaMaceKey = NamespacedKey.minecraft("mace");
 
-        if (Bukkit.getRecipe(vanillaMaceKey) == null) { // Ensure it's not already registered
-            Bukkit.reloadData(); // 🚀 Reload recipes without clearing everything
+        if (Bukkit.getRecipe(vanillaMaceKey) == null) {
+            Bukkit.reloadData();
             getLogger().info("[OneMace] Vanilla Mace recipe has been restored.");
         }
     }
@@ -523,6 +522,6 @@ public class OneMace extends JavaPlugin implements Listener {
 
         Material type = item.getType();
         return type == Material.BUNDLE ||
-                type.name().endsWith("_BUNDLE"); // Checks for any dyed bundle
+                type.name().endsWith("_BUNDLE");
     }
 }
