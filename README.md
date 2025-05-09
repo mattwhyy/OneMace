@@ -10,6 +10,7 @@
 
 [![Download on Modrinth](https://img.shields.io/modrinth/dt/onemace?style=flat&logo=modrinth&label=Download%20on%20Modrinth&link=https%3A%2F%2Fmodrinth.com%2Fmod%2Fmusichud)](https://modrinth.com/plugin/onemace)
 [![Download on CurseForge](https://img.shields.io/curseforge/dt/1200411?logo=curseforge&label=Download%20on%20CurseForge)](https://www.curseforge.com/minecraft/bukkit-plugins/onemace)
+[![Download on SpigotMC](https://img.shields.io/spiget/downloads/124864?logo=spigotmc&label=Download%20on%20SpigotMC)](https://www.spigotmc.org/resources/onemace.124864/)
 [![Download on GitHub](https://img.shields.io/github/downloads/mattwhyy/OneMace/total?style=flat&logo=github&label=Download%20on%20GitHub)](https://github.com/mattwhyy/OneMace/releases)
 
 **OneMace** introduces a unique gameplay twist by limiting the **entire server** to a **single Mace**. No more spamming Maces—strategy and skill are key! Perfect for **Lifesteal** and **competitive** **PvP** servers that want to balance the game.
