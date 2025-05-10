@@ -210,15 +210,16 @@ public class OneMace extends JavaPlugin implements Listener {
     }
 
     public boolean isMace(ItemStack item) {
-        if (item == null || item.getType() != Material.MACE || !item.hasItemMeta()) {
-            return false;
-        }
-        ItemMeta meta = item.getItemMeta();
-        if (meta != null) {
+        try {
+            if (item == null || item.getType() != Material.MACE || !item.hasItemMeta()) {
+                return false;
+            }
+            ItemMeta meta = item.getItemMeta();
             PersistentDataContainer data = meta.getPersistentDataContainer();
             return data.has(maceKey, PersistentDataType.STRING);
+        } catch (Exception e) {
+            return false;
         }
-        return false;
     }
 
     @EventHandler
@@ -464,9 +465,15 @@ public class OneMace extends JavaPlugin implements Listener {
 
     @EventHandler
     public void onBundleStore(InventoryClickEvent event) {
+        if (event.getClickedInventory() == null) {
+            return;
+        }
         Inventory clickedInventory = event.getClickedInventory();
         ItemStack cursorItem = event.getCursor();
         ItemStack clickedItem = event.getCurrentItem();
+        if (cursorItem == null || clickedItem == null) {
+            return;
+        }
 
         if (clickedInventory != null && clickedInventory.getType() == InventoryType.SHULKER_BOX || clickedInventory.getType() == InventoryType.HOPPER) {
             if (isMace(cursorItem) || isMace(clickedItem)) {
