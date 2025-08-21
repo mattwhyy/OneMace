@@ -2,6 +2,7 @@ settings:
   mace-crafted: false  # Changes to true when the Mace is crafted
   mace-owner: null  # Stores the UUID of the current owner, or null if no owner
   announce-mace-messages: true  # If true, broadcasts when the Mace is crafted or lost
+  allow-mace-in-containers: true # If true, allows players to put the Mace into containers like chests, ender chests etc.
 
 # Stores whether an offline player logged out with the Mace.
 # If set to true, the Mace is in their inventory or Ender Chest when they logged out.

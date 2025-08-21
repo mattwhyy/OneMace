@@ -37,7 +37,7 @@ public class OneMace extends JavaPlugin implements Listener {
 
         Bukkit.getScheduler().runTaskLater(this, () -> {
             if (!doesMaceExist()) {
-                resetMaceCrafting();
+                resetMaceCrafting(false);
                 getConfig().set("offline_inventory", null);
                 saveConfig();
             } else {
@@ -60,6 +60,9 @@ public class OneMace extends JavaPlugin implements Listener {
         }
         if (!getConfig().contains("messages.lost")) {
             getConfig().set("messages.lost", "&b[OneMace] &eThe Mace has been lost!");
+        }
+        if (!getConfig().contains("settings.allow-mace-in-containers")) {
+            getConfig().set("settings.allow-mace-in-containers", true);
         }
 
         saveConfig();
@@ -169,7 +172,11 @@ public class OneMace extends JavaPlugin implements Listener {
                 saveConfig();
             }
             else if (isMace(clickedItem) && (isStorageContainer(event.getInventory().getType()) || isAnimalStorage(event))) {
-                saveMaceOwner(null);
+                if (getConfig().getBoolean("settings.allow-mace-in-containers", true)) {
+                    saveMaceOwner(null);
+                } else {
+                    event.setCancelled(true);
+                }
             }
         }
     }
@@ -196,7 +203,7 @@ public class OneMace extends JavaPlugin implements Listener {
         saveConfig();
 
         if (!doesMaceExist()) {
-            resetMaceCrafting();
+            resetMaceCrafting(false);
         }
     }
 
@@ -402,7 +409,7 @@ public class OneMace extends JavaPlugin implements Listener {
         return maceOwner != null && maceOwner.equals(playerUUID);
     }
 
-    public void resetMaceCrafting() {
+    public void resetMaceCrafting(boolean announce) {
         maceCrafted = false;
         getConfig().set("settings.mace-crafted", false);
         getConfig().set("offline_inventory", null);
@@ -412,7 +419,7 @@ public class OneMace extends JavaPlugin implements Listener {
 
         getLogger().info("[OneMace] No Mace found. Crafting is re-enabled.");
 
-        if (getConfig().getBoolean("settings.announce-mace-messages", true)) {
+        if (announce && getConfig().getBoolean("settings.announce-mace-messages", true)) {
             String lostMessage = getConfig().getString("messages.lost", "&b[OneMace] The Mace has been lost!");
             Bukkit.broadcastMessage(ChatColor.translateAlternateColorCodes('&', lostMessage));
         }
@@ -433,7 +440,7 @@ public class OneMace extends JavaPlugin implements Listener {
         if (isMace(brokenItem)) {
             Bukkit.getScheduler().runTaskLater(this, () -> {
                 if (!doesMaceExist()) {
-                    resetMaceCrafting();
+                    resetMaceCrafting(true);
                 }
             }, 50L);
         }
@@ -444,7 +451,7 @@ public class OneMace extends JavaPlugin implements Listener {
         if (isMace(event.getEntity().getItemStack())) {
             Bukkit.getScheduler().runTaskLater(this, () -> {
                 if (!doesMaceExist()) {
-                    resetMaceCrafting();
+                    resetMaceCrafting(true);
                 }
             }, 50L);
         }
@@ -456,7 +463,7 @@ public class OneMace extends JavaPlugin implements Listener {
             if (isMace(item.getItemStack())) {
                 Bukkit.getScheduler().runTaskLater(this, () -> {
                     if (!doesMaceExist()) {
-                        resetMaceCrafting();
+                        resetMaceCrafting(true);
                     }
                 }, 50L);
             }

