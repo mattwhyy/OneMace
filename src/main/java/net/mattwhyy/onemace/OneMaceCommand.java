@@ -155,7 +155,7 @@ public class OneMaceCommand implements CommandExecutor {
 
         if (foundMaces.isEmpty()) {
             sender.sendMessage(ChatColor.GREEN + "No Mace found. Enabling crafting.");
-            plugin.resetMaceCrafting();
+            plugin.resetMaceCrafting(true);
             return;
         }
 
