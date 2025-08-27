@@ -2,6 +2,7 @@ package net.mattwhyy.onemace;
 
 import com.destroystokyo.paper.event.entity.EntityRemoveFromWorldEvent;
 import org.bukkit.*;
+import org.bukkit.block.Block;
 import org.bukkit.block.BlockState;
 import org.bukkit.block.Container;
 import org.bukkit.block.ShulkerBox;
@@ -11,7 +12,10 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.CrafterCraftEvent;
 import org.bukkit.event.entity.ItemDespawnEvent;
+import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.inventory.*;
+import org.bukkit.event.player.PlayerInteractEntityEvent;
+import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerItemBreakEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
@@ -20,6 +24,9 @@ import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataContainer;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.scoreboard.Scoreboard;
+import org.bukkit.scoreboard.Team;
+
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
@@ -64,6 +71,15 @@ public class OneMace extends JavaPlugin implements Listener {
         if (!getConfig().contains("settings.allow-mace-in-containers")) {
             getConfig().set("settings.allow-mace-in-containers", true);
         }
+        if (!getConfig().contains("settings.allow-locate-for-all")) {
+            getConfig().set("settings.allow-locate-for-all", false);
+        }
+        if (!getConfig().contains("settings.colored-name")) {
+            getConfig().set("settings.colored-name", false);
+        }
+        if (!getConfig().contains("settings.mace-name-color")) {
+            getConfig().set("settings.mace-name-color", "RED");
+        }
 
         saveConfig();
     }
@@ -88,10 +104,23 @@ public class OneMace extends JavaPlugin implements Listener {
             }
         }
 
+        if (isMaceOwner(player.getUniqueId())) {
+            saveMaceOwner(null);
+        }
+
         getConfig().set("offline_inventory." + player.getUniqueId().toString(), hasMace);
         saveConfig();
     }
 
+    @EventHandler
+    public void onPlayerDeath(PlayerDeathEvent event) {
+        for (ItemStack drop : event.getDrops()) {
+            if (isMace(drop)) {
+                saveMaceOwner(null);
+                break;
+            }
+        }
+    }
 
     @Override
     public void onDisable() {
@@ -166,6 +195,19 @@ public class OneMace extends JavaPlugin implements Listener {
             ItemStack cursorItem = event.getCursor();
             ItemStack clickedItem = event.getCurrentItem();
 
+            if (event.getClick() == ClickType.NUMBER_KEY) {
+                int hotbarSlot = event.getHotbarButton();
+                if (hotbarSlot >= 0) {
+                    ItemStack hotbarItem = player.getInventory().getItem(hotbarSlot);
+                    if (isMace(hotbarItem)) {
+                        if (!getConfig().getBoolean("settings.allow-mace-in-containers", true)) {
+                            event.setCancelled(true);
+                            return;
+                        }
+                    }
+                }
+            }
+
             if (isMace(cursorItem)) {
                 saveMaceOwner(player.getUniqueId());
                 getConfig().set("offline_inventory." + player.getUniqueId().toString(), false);
@@ -183,10 +225,12 @@ public class OneMace extends JavaPlugin implements Listener {
 
     private boolean isStorageContainer(org.bukkit.event.inventory.InventoryType type) {
         return type == org.bukkit.event.inventory.InventoryType.CHEST ||
+                type == org.bukkit.event.inventory.InventoryType.ENDER_CHEST ||
                 type == org.bukkit.event.inventory.InventoryType.BARREL ||
                 type == org.bukkit.event.inventory.InventoryType.DROPPER ||
                 type == org.bukkit.event.inventory.InventoryType.DISPENSER ||
                 type == org.bukkit.event.inventory.InventoryType.SHULKER_BOX ||
+                type == org.bukkit.event.inventory.InventoryType.CRAFTER ||
                 type == org.bukkit.event.inventory.InventoryType.HOPPER;
     }
 
@@ -204,6 +248,10 @@ public class OneMace extends JavaPlugin implements Listener {
 
         if (!doesMaceExist()) {
             resetMaceCrafting(false);
+        }
+
+        if (isMaceOwner(playerUUID)) {
+            updateMaceNameColor(playerUUID);
         }
     }
 
@@ -387,7 +435,35 @@ public class OneMace extends JavaPlugin implements Listener {
         return false;
     }
 
+    private void updateMaceNameColor(UUID ownerUUID) {
+        if (!getConfig().getBoolean("settings.colored-name", true)) {
+            return;
+        }
 
+        Scoreboard board = Bukkit.getScoreboardManager().getMainScoreboard();
+        Team maceTeam = board.getTeam("maceHolder");
+        if (maceTeam == null) {
+            maceTeam = board.registerNewTeam("maceHolder");
+        }
+
+        maceTeam.getEntries().forEach(maceTeam::removeEntry);
+
+        if (ownerUUID != null) {
+            Player player = Bukkit.getPlayer(ownerUUID);
+            if (player != null) {
+                String colorName = getConfig().getString("settings.mace-name-color", "RED").toUpperCase();
+                try {
+                    ChatColor color = ChatColor.valueOf(colorName);
+                    maceTeam.setColor(color);
+                } catch (IllegalArgumentException e) {
+                    maceTeam.setColor(ChatColor.RED);
+                }
+
+                maceTeam.addEntry(player.getName());
+                getLogger().info("[OneMace] Applied colored name to mace holder " + player.getName());
+            }
+        }
+    }
 
     public void saveMaceOwner(UUID ownerUUID) {
         if (ownerUUID == null) {
@@ -396,8 +472,9 @@ public class OneMace extends JavaPlugin implements Listener {
             getConfig().set("settings.mace-owner", ownerUUID.toString());
         }
         saveConfig();
-    }
 
+        updateMaceNameColor(ownerUUID);
+    }
 
     public UUID getMaceOwner() {
         String ownerUUID = getConfig().getString("settings.mace-owner");
@@ -467,6 +544,34 @@ public class OneMace extends JavaPlugin implements Listener {
                     }
                 }, 50L);
             }
+        }
+    }
+
+    @EventHandler
+    public void onInteract(PlayerInteractEvent event) {
+        if (event.getClickedBlock() == null) return;
+
+        Block block = event.getClickedBlock();
+        Player player = event.getPlayer();
+        ItemStack item = player.getInventory().getItemInMainHand();
+
+        if (item == null || item.getType() != Material.MACE) return;
+
+        if (block.getType() == Material.DECORATED_POT) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler
+    public void onInteractEntity(PlayerInteractEntityEvent event) {
+        Entity entity = event.getRightClicked();
+        Player player = event.getPlayer();
+        ItemStack item = player.getInventory().getItemInMainHand();
+
+        if (item == null || item.getType() != Material.MACE) return;
+
+        if (entity instanceof ItemFrame) {
+            event.setCancelled(true);
         }
     }
 

