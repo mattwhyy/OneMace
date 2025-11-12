@@ -3,7 +3,7 @@ plugins {
 }
 
 group = 'net.mattwhyy'
-version = '1.03-beta'
+version = '1.04-beta'
 
 repositories {
     mavenCentral()

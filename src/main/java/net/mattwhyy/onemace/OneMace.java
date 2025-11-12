@@ -68,10 +68,7 @@ public class OneMace extends JavaPlugin implements Listener {
         if (!getConfig().contains("messages.lost")) {
             getConfig().set("messages.lost", "&b[OneMace] &eThe Mace has been lost!");
         }
-        if (!getConfig().contains("settings.allow-mace-in-containers")) {
-            getConfig().set("settings.allow-mace-in-containers", true);
-        }
-        if (!getConfig().contains("settings.allow-locate-for-all")) {
+          if (!getConfig().contains("settings.allow-locate-for-all")) {
             getConfig().set("settings.allow-locate-for-all", false);
         }
         if (!getConfig().contains("settings.colored-name")) {
@@ -159,6 +156,11 @@ public class OneMace extends JavaPlugin implements Listener {
         }
     }
 
+    private boolean isAllowedContainer(org.bukkit.event.inventory.InventoryType type) {
+        return type == InventoryType.ENDER_CHEST ||
+                type == InventoryType.ANVIL ||
+                type == InventoryType.ENCHANTING;
+    }
 
     @EventHandler
     public void onMaceDrop(org.bukkit.event.player.PlayerDropItemEvent event) {
@@ -200,7 +202,7 @@ public class OneMace extends JavaPlugin implements Listener {
                 if (hotbarSlot >= 0) {
                     ItemStack hotbarItem = player.getInventory().getItem(hotbarSlot);
                     if (isMace(hotbarItem)) {
-                        if (!getConfig().getBoolean("settings.allow-mace-in-containers", true)) {
+                        if (!isAllowedContainer(event.getInventory().getType())) {
                             event.setCancelled(true);
                             return;
                         }
@@ -212,12 +214,18 @@ public class OneMace extends JavaPlugin implements Listener {
                 saveMaceOwner(player.getUniqueId());
                 getConfig().set("offline_inventory." + player.getUniqueId().toString(), false);
                 saveConfig();
-            }
-            else if (isMace(clickedItem) && (isStorageContainer(event.getInventory().getType()) || isAnimalStorage(event))) {
-                if (getConfig().getBoolean("settings.allow-mace-in-containers", true)) {
-                    saveMaceOwner(null);
-                } else {
+
+                if (!isAllowedContainer(event.getInventory().getType())) {
                     event.setCancelled(true);
+                    return;
+                }
+            }
+
+            else if (isMace(clickedItem) && (isStorageContainer(event.getInventory().getType()) || isAnimalStorage(event))) {
+                if (!isAllowedContainer(event.getInventory().getType())) {
+                    event.setCancelled(true);
+                } else {
+                    saveMaceOwner(null);
                 }
             }
         }
@@ -231,7 +239,9 @@ public class OneMace extends JavaPlugin implements Listener {
                 type == org.bukkit.event.inventory.InventoryType.DISPENSER ||
                 type == org.bukkit.event.inventory.InventoryType.SHULKER_BOX ||
                 type == org.bukkit.event.inventory.InventoryType.CRAFTER ||
-                type == org.bukkit.event.inventory.InventoryType.HOPPER;
+                type == org.bukkit.event.inventory.InventoryType.HOPPER ||
+                type == org.bukkit.event.inventory.InventoryType.ANVIL ||
+                type == org.bukkit.event.inventory.InventoryType.ENCHANTING;
     }
 
     private boolean isAnimalStorage(org.bukkit.event.inventory.InventoryClickEvent event) {
