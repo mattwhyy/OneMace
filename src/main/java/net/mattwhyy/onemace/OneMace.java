@@ -158,6 +158,7 @@ public class OneMace extends JavaPlugin implements Listener {
 
     private boolean isAllowedContainer(org.bukkit.event.inventory.InventoryType type) {
         return type == InventoryType.ENDER_CHEST ||
+                type == InventoryType.PLAYER ||
                 type == InventoryType.ANVIL ||
                 type == InventoryType.ENCHANTING;
     }
@@ -582,6 +583,22 @@ public class OneMace extends JavaPlugin implements Listener {
 
         if (entity instanceof ItemFrame) {
             event.setCancelled(true);
+        }
+    }
+
+    @EventHandler
+    public void onBundleInsert(InventoryClickEvent event) {
+        ItemStack cursor = event.getCursor();
+        ItemStack clicked = event.getCurrentItem();
+
+        if (isBundle(clicked) && isMace(cursor)) {
+            event.setCancelled(true);
+            ((Player) event.getWhoClicked()).updateInventory();
+        }
+
+        if (isBundle(cursor) && isMace(clicked)) {
+            event.setCancelled(true);
+            ((Player) event.getWhoClicked()).updateInventory();
         }
     }
 
