@@ -7,17 +7,20 @@ import org.bukkit.block.ShulkerBox;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
+import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.*;
 import org.bukkit.entity.minecart.StorageMinecart;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.BlockStateMeta;
 import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.util.StringUtil;
 
 import java.util.*;
 
-public class OneMaceCommand implements CommandExecutor {
+public class OneMaceCommand implements CommandExecutor, TabCompleter {
     private final OneMace plugin;
+    private final List<String> subCommands = Arrays.asList("locate", "info", "fix");
 
     public OneMaceCommand(OneMace plugin) {
         this.plugin = plugin;
@@ -270,7 +273,6 @@ public class OneMaceCommand implements CommandExecutor {
             }
         }
 
-
         if (plugin.getConfig().isConfigurationSection("offline_inventory")) {
             for (String uuid : plugin.getConfig().getConfigurationSection("offline_inventory").getKeys(true)) {
                 if (plugin.getConfig().getBoolean("offline_inventory." + uuid, true)) {
@@ -332,5 +334,14 @@ public class OneMaceCommand implements CommandExecutor {
         return maces;
     }
 
-
+    @Override
+    public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
+        if (args.length == 1) {
+            List<String> completions = new ArrayList<>();
+            StringUtil.copyPartialMatches(args[0], subCommands, completions);
+            completions.sort(String::compareToIgnoreCase);
+            return completions;
+        }
+        return new ArrayList<>();
+    }
 }

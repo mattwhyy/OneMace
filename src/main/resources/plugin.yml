@@ -1,5 +1,5 @@
 name: onemace
-version: '1.04'
+version: '1.05'
 main: net.mattwhyy.onemace.OneMace
 api-version: '1.21'
 commands:
