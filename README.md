@@ -9,9 +9,11 @@
 ![Purpur](https://img.shields.io/badge/Available%20for-Purpur-purple?style=flat&logo=data%3Aimage%2Fpng%3Bbase64%2CiVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAACxMAAAsTAQCanBgAAAAYdEVYdFNvZnR3YXJlAFBhaW50Lk5FVCA1LjEuN4vW9zkAAAC2ZVhJZklJKgAIAAAABQAaAQUAAQAAAEoAAAAbAQUAAQAAAFIAAAAoAQMAAQAAAAIAAAAxAQIAEAAAAFoAAABphwQAAQAAAGoAAAAAAAAASRkBAOgDAABJGQEA6AMAAFBhaW50Lk5FVCA1LjEuNwADAACQBwAEAAAAMDIzMAGgAwABAAAAAQAAAAWgBAABAAAAlAAAAAAAAAACAAEAAgAEAAAAUjk4AAIABwAEAAAAMDEwMAAAAADjQAdDcBQndgAACG1JREFUWEeVl3mMXVUdxz%2Fn3LPc995MZ7pali60CJRKAQtCy%2FYXgi1NBMRGaFCj%2FkE0BmI0SkvAQAwqEqMIsjTKVowFW8oixgIJhQCxFGqkjNYqDZQWCl2mnZl3z%2Bof93XKtLXALznJu%2B%2Bce77f8%2F0t53cFn9DmPpTxBRQJvII5f4C%2BebD6Sph%2FNzxxlTjwlcPax14956FMUCDy8DheZBbqgLKOR6xjfaNdk%2BoegPt%2F%2BPG2%2FshVc5dlKluDAojEGJm5QmS6ZOKBssKZwCJbIWzFg6Vja7MNUUJrEH7508ND%2FN%2FZ8%2B7P9Lfq3yJD0AjtuFhmZsvEqiR4WQdotkEHaLQ52Tq%2BZCvesBXLS49vDUIW0ByA6%2B4%2BNJQ88A%2BAU1Zk3u%2BFWNSSZkG39twqM1NaQyxWkZe72zX7rgGY9iYYz%2FpRA1ynA40ic3vZpnfqZmgOwdsT4Gdf60h4gI2gdcqKjNf75ZaJ6SLz5SLSazyVCiTj6SsrHrWOoe69NUAqANBF4qIiMst4pA6U1jFgKx4uHRsa7fpAzSH4xor9sAJg9p8yg7Z%2ByDVwj8hcLjPjZGLZaxew6ewVXGAc5%2BiA0IFkK55tOZ5RDorIXJn4vAlo4xBF4uUEj3cPMtE6FpUVVVnxQOl4v9GGJMG24ZJnRU3gM49lkgSvkcpzocycLRNPhoLnja%2BDqUjQaNNlPJdYx3EqEKzHG0cqIrZ0qCKyuUg8kmGHTHU22ACNIU6zji%2FainXNIVZlSWi0YcFzoo4BISAKUIHvysy8lFhsPM8fvQ1KD717YOwuKB17m23us44V1jHDONbpwNqy4jgVedp67raeHaUH42HsbjhrKTTbrO0dYIkJnI5gcVB1bA274MTHM8AsmbjWBN5VgW3W8bB1bCzb8PhJ8JWXQGSkzMwvEqcZR9IBaTzZeLL2FNbx97LNqtLhuvtBZ5AZyEyWict0YKoJTCgit2TB3%2Bav6bjg5JUZ4CwBM23FgA6cpQLCeF61FcutZ6cOnC4T83TAdPy8rgg8OnEzYXAc88uKOTqA8QRbsbpVsabwdBWZS4vImcZTFJEXywpk5i1g9fkvdQicvjwDnC0y44EVzTbTjeMy45mmA%2F3G0a8iyjiyimwrEg9n2K5iHdXWQbNNr3Vcah2TVQDrSdrT0oEx2rO5SCwvHX1lmwsRROCv573SiQHT8Zmu0weR2JQlN6vAvcYhVeTJsmKsCWxViTtaQ2yXGcbshqlbYMJOGDXArtKx1Dr6rGeycTxmPFoFllWGG5Ogr3sv6IDquAz2FSLtwbj9RLoGQQUoHS8Yz%2FqyYoHxlLZiRmuAHzSGOObod6GnH4pYp5RxHGkrrtaeuWVFNp6LjecN4JlGBVmOOCjmwwTsfvBkHbSGYNyOThrVc7qI3Gs8r1vPVBX5nox8XWS6s6DMgstl4lrtmaED%2F9SBpcZTGE8uHZQVzPj3MHgyHjGCwD7w0jGxa7BT3UQNbh3COqR1bEFwlwr8xnje1YHPqcgS4AYdOM94dhSJO3TgttYAmzsgwniYsqVWQAcwgU%2FpQNLhYAU2GMdYW3G1SBw1eg%2FYapgE1qN0AJl5PRpuNJ6V1uOsw6nIE5M2cH0WvDZmN%2BiI2if3vhKcYUKG78jEVO1Zrz5MwNQxMN06ZljHaJX4tkxcvr2JMDUIpkOkNQA9uyBK%2FmIclQ6wfRSrtpxAzmKEj4X2%2BKcmAYLLBFyjIxOM41gdOOEgF1hPqSKrdGC1dSTtmXlkP4utY451ROOJtqoDdMwu6BpAWE%2B2jjRtK6p0MHNjh0DorHfMXriBxUXkVONJMvGcCTyiA%2BVIBfafMABrisDNOtBXVnSrwEbr2NZsM713Tx2gPf3D74gOIE7Ul4z2YB3HqMAHOtCnAz0qsElkfm48q3XAqQg6fjgGagWGN5SwV2buLyK3NSrGGcc%2FjONc47hKJsY7C6euJXcCVIhEnv4OZBidBd%2BUmS9Yx6vGM1Em7syCpRl2ter0FirUaX6wAp16MGpPPbqGeKus%2BJcJzLOOXuM5okhcIxOXvHUsxniC8aTuAQoyCwR8XwWmGEe3DlykAptFZpPXdWdUxHqozjhQAaE9sdmGRlXXgNYgGI%2ByjqAit%2BvAi9aRdeCzqr4xpxjHkdazuEicaes74hXj%2BbUOOB0ojIfeXTBp2zBw2EfkQAXazTYzj1%2BHbA3C2B2d9HRk45HG4YE%2FF5FbtOdN42iowNMm8JTxNHVgi8jcqiIrraOtA1LFWuquobrRMR6KyElFpBpBwDq4YQZrtWfd9mncJBPnDDWHswPjyNYjdACR2Skz96jA761jlnHMFollWXB7Fmzv3Q0qIlUg61CraQIgOCMW%2FETARht5Qe5r%2B6AuFD%2FeADLzpArcXCRmFpElInOUcfh9Fc24Og3H7wAEG4zHqYj4zzheNa7j51SfWgdEEXGNNhMy%2FIjMGWR%2BkWGFl6QavkNgyZ2C0f21z2WmX2Z%2BWySWqcgVJjDfOoIK%2BEa1vw03bYSpe4Z88maUijD17XquSPgi4nXg%2FCT5FrASwa8QfJBFTdSkujE9qFm%2Fb0Gm0Yag6rzu2cOnm0OcqwOiv5t7Jr1Tt%2BI7uxDdba5TEVtEro%2BSMGZ3rUAWLBKZHpl4Okr6VKw%2FVFSERhgJKUc8AVc%2BJiirWo3GEKjIRuX4nYrsnvgeN8nEaUHD%2BP7axyrAyomE0XsAmJUEN5IRKnJXFjV4FqDSweAcSoED7blTM7lzM5aOccazyHis9jxYJL5aRKzx3CkTC0WmkJkHgK2yVoLu9uEhDj%2FbsVdOyBhfu8TUpfZE7VmoI1NUAJl4R2T%2BCLwmU72rSDDqI8A%2FsW08OvN%2BmfnvEZlMFu%2F15sk7uvLUna1c7GxlWJPZ1cwM6EN%2Fhh3K%2FgcDpjxbjzc0ZgAAAABJRU5ErkJggg%3D%3D&color=purple)
 
 [![Download on Modrinth](https://img.shields.io/modrinth/dt/onemace?style=flat&logo=modrinth&label=Download%20on%20Modrinth&link=https%3A%2F%2Fmodrinth.com%2Fmod%2Fmusichud)](https://modrinth.com/plugin/onemace)
-[![Download on CurseForge](https://img.shields.io/curseforge/dt/1200411?logo=curseforge&label=Download%20on%20CurseForge)](https://www.curseforge.com/minecraft/bukkit-plugins/onemace)
-[![Download on SpigotMC](https://img.shields.io/spiget/downloads/124864?logo=spigotmc&label=Download%20on%20SpigotMC)](https://www.spigotmc.org/resources/onemace.124864/)
 [![Download on GitHub](https://img.shields.io/github/downloads/mattwhyy/OneMace/total?style=flat&logo=github&label=Download%20on%20GitHub)](https://github.com/mattwhyy/OneMace/releases)
+
+**Tired of plugins that _claim_ to fix multiple Maces—but don’t?**
+
+OneMace enforces a hard limit: players can have only **one** Mace. **No** bypasses. **Period.**
 
 **OneMace** introduces a unique gameplay twist by limiting the **entire server** to a **single Mace**. No more spamming Maces—strategy and skill are key! Perfect for **Lifesteal** and **competitive** **PvP** servers that want to balance the game.
 
@@ -22,12 +24,16 @@
 ## Configuration
 ```
 settings:
-  mace-crafted: false  # Changes to true when the Mace is crafted
-  mace-owner: null  # Stores the UUID of the current owner, or null if no owner
-  announce-mace-messages: true  # If true, broadcasts when the Mace is crafted or lost
+  mace-crafted: false  # Changes to true when the Mace is crafted.
+  mace-owner: null  # Stores the UUID of the current owner, or null if no owner.
+  announce-mace-messages: true  # If true, broadcasts when the Mace is crafted or lost.
   allow-locate-for-all: false # If true, allows any player to use the '/onemace locate' subcommand.
-  colored-name: false # If true, the player that has the Mace will have a colored name
-  mace-name-color: "RED" # The color of the name, use Chat Colors
+  colored-name: false # If true, the player that has the Mace will have a colored name.
+  mace-name-color: "RED" # The color of the name, use Chat Colors.
+  optional-allowed-containers: # Containers that the Mace is allowed to be placed into.
+    - ENDER_CHEST
+    - ANVIL
+    - ENCHANTING
 
 # Stores whether an offline player logged out with the Mace.
 # If set to true, the Mace is in their inventory or Ender Chest when they logged out.
@@ -69,7 +75,7 @@ Put the ```jar``` file into your server's **plugin folder**.
 **Restart** (or reload) the server!
 
 ## Bypasses & Limitations
-⚠️ **Maces in unloaded chunks will NOT be detected. This is unfortunately unfixable. It is up to you to detect and use the admin commands if you suspect there may be more than one Mace.**
+⚠️ **Maces in unloaded chunks will NOT be detected. This is unfortunately unfixable due to how Minecraft works. It is up to you to detect and use the admin commands if you suspect there may be more than one Mace.**
 
 Otherwise, this plugin should work perfectly on a clean vanilla server.
 ## Contact
