@@ -14,6 +14,7 @@ import org.bukkit.event.block.CrafterCraftEvent;
 import org.bukkit.event.entity.ItemDespawnEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.inventory.*;
+import org.bukkit.event.player.PlayerArmorStandManipulateEvent;
 import org.bukkit.event.player.PlayerInteractEntityEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerItemBreakEvent;
@@ -41,7 +42,7 @@ public class OneMace extends JavaPlugin implements Listener {
         maceCrafted = getConfig().getBoolean("settings.mace-crafted", false);
 
         Bukkit.getScheduler().runTaskLater(this, () -> {
-            if (!doesMaceExist()) {
+            if (fullMaceAudit()) {
                 resetMaceCrafting(false);
                 getConfig().set("offline_inventory", null);
                 saveConfig();
@@ -57,32 +58,51 @@ public class OneMace extends JavaPlugin implements Listener {
         getLogger().info("[OneMace] Plugin enabled!");
     }
 
+    private boolean configDirty = false;
+
+    public void markConfigDirty() {
+        if (configDirty) return;
+        configDirty = true;
+
+        Bukkit.getScheduler().runTaskLater(this, () -> {
+            saveConfig();
+            configDirty = false;
+        }, 40L);
+    }
+
     public void updateConfig() {
-        getConfig().options().copyDefaults(true);
-        saveConfig();
+        boolean changed = false;
 
         if (!getConfig().contains("messages.crafted")) {
             getConfig().set("messages.crafted", "&b[OneMace] &eThe Mace has been crafted!");
+            changed = true;
         }
         if (!getConfig().contains("messages.lost")) {
             getConfig().set("messages.lost", "&b[OneMace] &eThe Mace has been lost!");
+            changed = true;
         }
 
         if (!getConfig().contains("settings.allow-locate-for-all")) {
             getConfig().set("settings.allow-locate-for-all", false);
+            changed = true;
         }
         if (!getConfig().contains("settings.colored-name")) {
             getConfig().set("settings.colored-name", false);
+            changed = true;
         }
         if (!getConfig().contains("settings.mace-name-color")) {
             getConfig().set("settings.mace-name-color", "RED");
+            changed = true;
         }
 
         if (!getConfig().contains("settings.optional-allowed-containers")) {
             getConfig().set("settings.optional-allowed-containers", Arrays.asList("ENDER_CHEST", "ANVIL", "ENCHANTING"));
+            changed = true;
         }
 
-        saveConfig();
+        if (changed) {
+            markConfigDirty();
+        }
     }
 
     private final Set<InventoryType> mandatoryContainers = Set.of(
@@ -134,7 +154,7 @@ public class OneMace extends JavaPlugin implements Listener {
         }
 
         getConfig().set("offline_inventory." + player.getUniqueId(), hasMace);
-        saveConfig();
+        markConfigDirty();
     }
 
     @EventHandler
@@ -197,7 +217,7 @@ public class OneMace extends JavaPlugin implements Listener {
             getLogger().info("[OneMace] Mace ownership cleared due to drop.");
 
             getConfig().set("offline_inventory." + player.getUniqueId(), false);
-            saveConfig();
+            markConfigDirty();
         }
     }
 
@@ -368,9 +388,9 @@ public class OneMace extends JavaPlugin implements Listener {
         UUID playerUUID = event.getPlayer().getUniqueId();
 
         getConfig().set("offline_inventory." + playerUUID, null);
-        saveConfig();
+        markConfigDirty();
 
-        if (!doesMaceExist()) {
+        if (fullMaceAudit()) {
             resetMaceCrafting(false);
         }
 
@@ -420,7 +440,7 @@ public class OneMace extends JavaPlugin implements Listener {
             maceCrafted = true;
             getConfig().set("settings.mace-crafted", true);
             saveMaceOwner(event.getWhoClicked().getUniqueId());
-            saveConfig();
+            markConfigDirty();
 
             ItemStack mace = event.getInventory().getResult();
             if (mace != null) {
@@ -445,20 +465,20 @@ public class OneMace extends JavaPlugin implements Listener {
         }
     }
 
-    private boolean doesMaceExist() {
+    private boolean fullMaceAudit() {
         getLogger().info("[OneMace] Checking if Mace exists...");
 
         for (Player player : Bukkit.getOnlinePlayers()) {
             for (ItemStack item : player.getInventory().getContents()) {
                 if (isMace(item) || isMaceInsideShulker(item)) {
                     getLogger().info("[OneMace] Mace found in " + player.getName() + "'s inventory.");
-                    return true;
+                    return false;
                 }
             }
             for (ItemStack item : player.getEnderChest().getContents()) {
                 if (isMace(item) || isMaceInsideShulker(item)) {
                     getLogger().info("[OneMace] Mace found in " + player.getName() + "'s Ender Chest.");
-                    return true;
+                    return false;
                 }
             }
         }
@@ -467,7 +487,7 @@ public class OneMace extends JavaPlugin implements Listener {
             for (Entity entity : world.getEntities()) {
                 if (entity instanceof Item item && (isMace(item.getItemStack()) || isMaceInsideShulker(item.getItemStack()))) {
                     getLogger().info("[OneMace] Mace found as a dropped item in world: " + world.getName());
-                    return true;
+                    return false;
                 }
             }
         }
@@ -480,7 +500,7 @@ public class OneMace extends JavaPlugin implements Listener {
                         for (ItemStack item : inv.getContents()) {
                             if (isMace(item) || isMaceInsideShulker(item)) {
                                 getLogger().info("[OneMace] Mace found inside a container at " + state.getLocation());
-                                return true;
+                                return false;
                             }
                         }
                     }
@@ -494,7 +514,7 @@ public class OneMace extends JavaPlugin implements Listener {
                     for (ItemStack item : horse.getInventory().getContents()) {
                         if (isMace(item) || isMaceInsideShulker(item)) {
                             getLogger().info("[OneMace] Mace found in a horse inventory!");
-                            return true;
+                            return false;
                         }
                     }
                 }
@@ -502,7 +522,7 @@ public class OneMace extends JavaPlugin implements Listener {
                     for (ItemStack item : minecart.getInventory().getContents()) {
                         if (isMace(item) || isMaceInsideShulker(item)) {
                             getLogger().info("[OneMace] Mace found in a storage minecart!");
-                            return true;
+                            return false;
                         }
                     }
                 }
@@ -514,7 +534,7 @@ public class OneMace extends JavaPlugin implements Listener {
                                     " Y: " + entity.getLocation().getBlockY() +
                                     " Z: " + entity.getLocation().getBlockZ() +
                                     " in world " + entity.getWorld().getName());
-                            return true;
+                            return false;
                         }
                     }
                 }
@@ -525,7 +545,7 @@ public class OneMace extends JavaPlugin implements Listener {
             for (String uuid : getConfig().getConfigurationSection("offline_inventory").getKeys(true)) {
                 if (getConfig().getBoolean("offline_inventory." + uuid, true)) {
                     getLogger().info("[OneMace] Mace is in an offline player's inventory (UUID: " + uuid + ").");
-                    return true;
+                    return false;
                 }
             }
         }
@@ -533,8 +553,8 @@ public class OneMace extends JavaPlugin implements Listener {
         getLogger().info("[OneMace] Mace does not exist! Crafting can be re-enabled.");
 
         getConfig().set("offline_inventory", null);
-        saveConfig();
-        return false;
+        markConfigDirty();
+        return true;
     }
 
     private boolean isMaceInsideShulker(ItemStack item) {
@@ -581,7 +601,6 @@ public class OneMace extends JavaPlugin implements Listener {
                 }
 
                 maceTeam.addEntry(player.getName());
-                getLogger().info("[OneMace] Applied colored name to mace holder " + player.getName());
             }
         }
     }
@@ -592,7 +611,7 @@ public class OneMace extends JavaPlugin implements Listener {
         } else {
             getConfig().set("settings.mace-owner", ownerUUID.toString());
         }
-        saveConfig();
+        markConfigDirty();
 
         updateMaceNameColor(ownerUUID);
     }
@@ -611,7 +630,7 @@ public class OneMace extends JavaPlugin implements Listener {
         maceCrafted = false;
         getConfig().set("settings.mace-crafted", false);
         getConfig().set("offline_inventory", null);
-        saveConfig();
+        markConfigDirty();
 
         addVanillaMaceRecipe();
 
@@ -637,7 +656,7 @@ public class OneMace extends JavaPlugin implements Listener {
         ItemStack brokenItem = event.getBrokenItem();
         if (isMace(brokenItem)) {
             Bukkit.getScheduler().runTaskLater(this, () -> {
-                if (!doesMaceExist()) {
+                if (fullMaceAudit()) {
                     resetMaceCrafting(true);
                 }
             }, 50L);
@@ -648,7 +667,7 @@ public class OneMace extends JavaPlugin implements Listener {
     public void onItemDespawn(ItemDespawnEvent event) {
         if (isMace(event.getEntity().getItemStack())) {
             Bukkit.getScheduler().runTaskLater(this, () -> {
-                if (!doesMaceExist()) {
+                if (fullMaceAudit()) {
                     resetMaceCrafting(true);
                 }
             }, 50L);
@@ -660,7 +679,7 @@ public class OneMace extends JavaPlugin implements Listener {
         if (event.getEntity() instanceof Item item) {
             if (isMace(item.getItemStack())) {
                 Bukkit.getScheduler().runTaskLater(this, () -> {
-                    if (!doesMaceExist()) {
+                    if (fullMaceAudit()) {
                         resetMaceCrafting(true);
                     }
                 }, 50L);
@@ -685,14 +704,30 @@ public class OneMace extends JavaPlugin implements Listener {
 
     @EventHandler
     public void onInteractEntity(PlayerInteractEntityEvent event) {
-        Entity entity = event.getRightClicked();
+        if (!(event.getRightClicked() instanceof ItemFrame)) return;
+
         Player player = event.getPlayer();
-        ItemStack item = player.getInventory().getItemInMainHand();
 
-        if (item == null || item.getType() != Material.MACE) return;
+        ItemStack main = player.getInventory().getItemInMainHand();
+        ItemStack off = player.getInventory().getItemInOffHand();
 
-        if (entity instanceof ItemFrame) {
+        if (isMace(main) || isMace(off)) {
             event.setCancelled(true);
+            player.updateInventory();
+        }
+    }
+
+    @EventHandler
+    public void onArmorStandManipulate(PlayerArmorStandManipulateEvent event) {
+
+        Player player = event.getPlayer();
+
+        ItemStack main = player.getInventory().getItemInMainHand();
+        ItemStack off = player.getInventory().getItemInOffHand();
+
+        if (isMace(main) || isMace(off)) {
+            event.setCancelled(true);
+            player.updateInventory();
         }
     }
 
