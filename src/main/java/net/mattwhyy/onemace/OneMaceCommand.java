@@ -1,5 +1,8 @@
 package net.mattwhyy.onemace;
 
+import net.md_5.bungee.api.chat.ClickEvent;
+import net.md_5.bungee.api.chat.ComponentBuilder;
+import net.md_5.bungee.api.chat.TextComponent;
 import org.bukkit.*;
 import org.bukkit.block.BlockState;
 import org.bukkit.block.Container;
@@ -13,6 +16,7 @@ import org.bukkit.entity.minecart.StorageMinecart;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.BlockStateMeta;
+import org.bukkit.inventory.meta.BundleMeta;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.util.StringUtil;
 
@@ -71,10 +75,67 @@ public class OneMaceCommand implements CommandExecutor, TabCompleter {
         return true;
     }
 
+    private void sendTeleportMessage(CommandSender sender, String message, Location loc) {
+        String coords = ChatColor.GOLD + "X: " + loc.getBlockX()
+                + " Y: " + loc.getBlockY()
+                + " Z: " + loc.getBlockZ()
+                + ChatColor.GRAY + " in world " + loc.getWorld().getName();
+
+        if (sender instanceof Player player && player.isOp()) {
+
+            String command = "/tp " + loc.getBlockX() + " " + loc.getBlockY() + " " + loc.getBlockZ();
+
+            TextComponent text = new TextComponent(TextComponent.fromLegacyText(message + " " + coords + " "));
+
+            TextComponent click = new TextComponent("[TELEPORT]");
+            click.setColor(ChatColor.GREEN.asBungee());
+            click.setBold(true);
+
+            click.setClickEvent(new ClickEvent(
+                    ClickEvent.Action.SUGGEST_COMMAND,
+                    command
+            ));
+            click.setHoverEvent(new net.md_5.bungee.api.chat.HoverEvent(
+                    net.md_5.bungee.api.chat.HoverEvent.Action.SHOW_TEXT,
+                    new ComponentBuilder("Click to teleport").create()
+            ));
+
+            player.spigot().sendMessage(text, click);
+        } else {
+            sender.sendMessage(message + " " + coords);
+        }
+    }
+
+    private void sendPlayerTeleport(CommandSender sender, Player target, String where) {
+        if (!(sender instanceof Player p)) return;
+
+        if (p.isOp()) {
+            String cmd = "/tp " + target.getName();
+
+            TextComponent msg = new TextComponent(ChatColor.GREEN + "The Mace is in "
+                    + ChatColor.AQUA + target.getName() + "'s " + where + " ");
+
+            TextComponent click = new TextComponent("[TELEPORT]");
+            click.setColor(ChatColor.GREEN.asBungee());
+            click.setBold(true);
+            click.setClickEvent(new ClickEvent(
+                    ClickEvent.Action.SUGGEST_COMMAND,
+                    cmd
+            ));
+            click.setHoverEvent(new net.md_5.bungee.api.chat.HoverEvent(
+                    net.md_5.bungee.api.chat.HoverEvent.Action.SHOW_TEXT,
+                    new ComponentBuilder("Click to teleport").create()
+            ));
+
+            p.spigot().sendMessage(msg, click);
+        } else {
+            p.sendMessage(ChatColor.GREEN + "The Mace is in " + ChatColor.AQUA + target.getName() + "'s " + where + ".");
+        }
+    }
+
     private void fixDuplicateMaces(CommandSender sender) {
         List<ItemStack> foundMaces = new ArrayList<>();
         List<ItemStack> duplicates = new ArrayList<>();
-        UUID maceOwner = plugin.getMaceOwner();
 
         sender.sendMessage(ChatColor.YELLOW + "Running Mace scan...");
 
@@ -82,10 +143,12 @@ public class OneMaceCommand implements CommandExecutor, TabCompleter {
             for (ItemStack item : player.getInventory().getContents()) {
                 if (isAnyMace(item)) foundMaces.add(item);
                 else if (isMaceInsideShulker(item)) foundMaces.addAll(getMacesFromShulker(item));
+                else if (isMaceInsideBundle(item)) foundMaces.addAll(getMacesFromBundle(item));
             }
             for (ItemStack item : player.getEnderChest().getContents()) {
                 if (isAnyMace(item)) foundMaces.add(item);
                 else if (isMaceInsideShulker(item)) foundMaces.addAll(getMacesFromShulker(item));
+                else if (isMaceInsideBundle(item)) foundMaces.addAll(getMacesFromBundle(item));
             }
         }
 
@@ -95,6 +158,7 @@ public class OneMaceCommand implements CommandExecutor, TabCompleter {
                     for (ItemStack item : horse.getInventory().getContents()) {
                         if (isAnyMace(item)) foundMaces.add(item);
                         else if (isMaceInsideShulker(item)) foundMaces.addAll(getMacesFromShulker(item));
+                        else if (isMaceInsideBundle(item)) foundMaces.addAll(getMacesFromBundle(item));
                     }
                 }
             }
@@ -106,6 +170,7 @@ public class OneMaceCommand implements CommandExecutor, TabCompleter {
                     ItemStack droppedItem = item.getItemStack();
                     if (isAnyMace(droppedItem)) foundMaces.add(droppedItem);
                     else if (isMaceInsideShulker(droppedItem)) foundMaces.addAll(getMacesFromShulker(droppedItem));
+                    else if (isMaceInsideBundle(droppedItem)) foundMaces.addAll(getMacesFromBundle(droppedItem));
                 }
             }
         }
@@ -117,6 +182,7 @@ public class OneMaceCommand implements CommandExecutor, TabCompleter {
                         for (ItemStack item : container.getInventory().getContents()) {
                             if (isAnyMace(item)) foundMaces.add(item);
                             else if (isMaceInsideShulker(item)) foundMaces.addAll(getMacesFromShulker(item));
+                            else if (isMaceInsideBundle(item)) foundMaces.addAll(getMacesFromBundle(item));
                         }
                     }
                 }
@@ -129,12 +195,14 @@ public class OneMaceCommand implements CommandExecutor, TabCompleter {
                     for (ItemStack item : minecart.getInventory().getContents()) {
                         if (isAnyMace(item)) foundMaces.add(item);
                         else if (isMaceInsideShulker(item)) foundMaces.addAll(getMacesFromShulker(item));
+                        else if (isMaceInsideBundle(item)) foundMaces.addAll(getMacesFromBundle(item));
                     }
                 }
                 if (entity instanceof ChestBoat chestBoat) {
                     for (ItemStack item : chestBoat.getInventory().getContents()) {
                         if (isAnyMace(item)) foundMaces.add(item);
                         else if (isMaceInsideShulker(item)) foundMaces.addAll(getMacesFromShulker(item));
+                        else if (isMaceInsideBundle(item)) foundMaces.addAll(getMacesFromBundle(item));
                     }
                 }
             }
@@ -173,14 +241,14 @@ public class OneMaceCommand implements CommandExecutor, TabCompleter {
     private void locateMace(CommandSender sender) {
         for (Player player : Bukkit.getOnlinePlayers()) {
             for (ItemStack item : player.getInventory().getContents()) {
-                if (isAnyMace(item) || isMaceInsideShulker(item)) {
-                    sender.sendMessage(ChatColor.GREEN + "The Mace is in " + ChatColor.AQUA + player.getName() + "'s Inventory.");
+                if (isAnyMace(item) || isMaceInsideShulker(item) || isMaceInsideBundle(item))  {
+                    sendPlayerTeleport(sender, player, "Inventory");
                     return;
                 }
             }
             for (ItemStack item : player.getEnderChest().getContents()) {
-                if (isAnyMace(item) || isMaceInsideShulker(item)) {
-                    sender.sendMessage(ChatColor.GREEN + "The Mace is in " + ChatColor.AQUA + player.getName() + "'s Ender Chest.");
+                if (isAnyMace(item) || isMaceInsideShulker(item) || isMaceInsideBundle(item)) {
+                    sendPlayerTeleport(sender, player, "Ender Chest");
                     return;
                 }
             }
@@ -190,12 +258,10 @@ public class OneMaceCommand implements CommandExecutor, TabCompleter {
             for (Entity entity : world.getEntities()) {
                 if (entity instanceof AbstractHorse horse) {
                     for (ItemStack item : horse.getInventory().getContents()) {
-                        if (isAnyMace(item) || isMaceInsideShulker(item)) {
-                            sender.sendMessage(ChatColor.YELLOW + "The Mace is in a storage animal at " +
-                                    ChatColor.GOLD + "X: " + entity.getLocation().getBlockX() +
-                                    " Y: " + entity.getLocation().getBlockY() +
-                                    " Z: " + entity.getLocation().getBlockZ() +
-                                    ChatColor.GRAY + " in world " + entity.getWorld().getName());
+                        if (isAnyMace(item) || isMaceInsideShulker(item) || isMaceInsideBundle(item)) {
+                            sendTeleportMessage(sender,
+                                    ChatColor.YELLOW + "The Mace is in a storage animal at",
+                                    entity.getLocation());
                             return;
                         }
                     }
@@ -207,11 +273,11 @@ public class OneMaceCommand implements CommandExecutor, TabCompleter {
             for (Entity entity : world.getEntities()) {
                 if (entity instanceof Item item) {
                     ItemStack droppedItem = item.getItemStack();
-                    if (isAnyMace(droppedItem) || isMaceInsideShulker(droppedItem)) {
+                    if (isAnyMace(droppedItem) || isMaceInsideShulker(droppedItem) || isMaceInsideBundle(droppedItem)) {
                         Location loc = entity.getLocation();
-                        sender.sendMessage(ChatColor.YELLOW + "The Mace is dropped at " +
-                                ChatColor.GOLD + "X: " + loc.getBlockX() + " Y: " + loc.getBlockY() + " Z: " + loc.getBlockZ() +
-                                ChatColor.GRAY + " in world " + loc.getWorld().getName());
+                        sendTeleportMessage(sender,
+                                ChatColor.YELLOW + "The Mace is dropped at",
+                                loc);
                         return;
                     }
                 }
@@ -224,11 +290,11 @@ public class OneMaceCommand implements CommandExecutor, TabCompleter {
                     if (state instanceof Container container) {
                         Inventory inv = container.getInventory();
                         for (ItemStack item : inv.getContents()) {
-                            if (isAnyMace(item) || isMaceInsideShulker(item)) {
+                            if (isAnyMace(item) || isMaceInsideShulker(item) || isMaceInsideBundle(item)) {
                                 Location loc = state.getLocation();
-                                sender.sendMessage(ChatColor.YELLOW + "The Mace is stored in a container at " +
-                                        ChatColor.GOLD + "X: " + loc.getBlockX() + " Y: " + loc.getBlockY() + " Z: " + loc.getBlockZ() +
-                                        ChatColor.GRAY + " in world " + loc.getWorld().getName());
+                                sendTeleportMessage(sender,
+                                        ChatColor.YELLOW + "The Mace is stored in a container at",
+                                        loc);
                                 return;
                             }
                         }
@@ -242,12 +308,10 @@ public class OneMaceCommand implements CommandExecutor, TabCompleter {
                 if (entity instanceof StorageMinecart minecart) {
                     Inventory inv = minecart.getInventory();
                     for (ItemStack item : inv.getContents()) {
-                        if (isAnyMace(item) || isMaceInsideShulker(item)) {
-                            sender.sendMessage(ChatColor.YELLOW + "The Mace is in a storage minecart at " +
-                                    ChatColor.GOLD + "X: " + entity.getLocation().getBlockX() +
-                                    " Y: " + entity.getLocation().getBlockY() +
-                                    " Z: " + entity.getLocation().getBlockZ() +
-                                    ChatColor.GRAY + " in world " + entity.getWorld().getName());
+                        if (isAnyMace(item) || isMaceInsideShulker(item) || isMaceInsideBundle(item)) {
+                            sendTeleportMessage(sender,
+                                    ChatColor.YELLOW + "The Mace is in a storage minecart at",
+                                    entity.getLocation());
                             return;
                         }
                     }
@@ -260,12 +324,10 @@ public class OneMaceCommand implements CommandExecutor, TabCompleter {
                 if (entity instanceof ChestBoat chestBoat) {
                     Inventory inv = chestBoat.getInventory();
                     for (ItemStack item : inv.getContents()) {
-                        if (isAnyMace(item) || isMaceInsideShulker(item)) {
-                            sender.sendMessage(ChatColor.YELLOW + "The Mace is in a Chest Boat at " +
-                                    ChatColor.GOLD + "X: " + entity.getLocation().getBlockX() +
-                                    " Y: " + entity.getLocation().getBlockY() +
-                                    " Z: " + entity.getLocation().getBlockZ() +
-                                    ChatColor.GRAY + " in world " + entity.getWorld().getName());
+                        if (isAnyMace(item) || isMaceInsideShulker(item) || isMaceInsideBundle(item)) {
+                            sendTeleportMessage(sender,
+                                    ChatColor.YELLOW + "The Mace is in a Chest Boat at",
+                                    entity.getLocation());
                             return;
                         }
                     }
@@ -275,7 +337,7 @@ public class OneMaceCommand implements CommandExecutor, TabCompleter {
 
         if (plugin.getConfig().isConfigurationSection("offline_inventory")) {
             for (String uuid : plugin.getConfig().getConfigurationSection("offline_inventory").getKeys(true)) {
-                if (plugin.getConfig().getBoolean("offline_inventory." + uuid, true)) {
+                if (plugin.getConfig().getBoolean("offline_inventory." + uuid, false)) {
                     UUID offlineUUID = UUID.fromString(uuid);
                     OfflinePlayer offlinePlayer = Bukkit.getOfflinePlayer(offlineUUID);
                     String name = offlinePlayer.getName();
@@ -329,6 +391,35 @@ public class OneMaceCommand implements CommandExecutor, TabCompleter {
         for (ItemStack storedItem : shulkerInv.getContents()) {
             if (isAnyMace(storedItem)) {
                 maces.add(storedItem);
+            }
+        }
+        return maces;
+    }
+
+    private boolean isMaceInsideBundle(ItemStack item) {
+        if (item == null || !(item.getItemMeta() instanceof BundleMeta bundleMeta)) {
+            return false;
+        }
+        for (ItemStack stored : bundleMeta.getItems()) {
+            if (isAnyMace(stored) || isMaceInsideShulker(stored) || isMaceInsideBundle(stored)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private List<ItemStack> getMacesFromBundle(ItemStack item) {
+        List<ItemStack> maces = new ArrayList<>();
+        if (item == null || !(item.getItemMeta() instanceof BundleMeta bundleMeta)) {
+            return maces;
+        }
+        for (ItemStack stored : bundleMeta.getItems()) {
+            if (isAnyMace(stored)) {
+                maces.add(stored);
+            } else if (isMaceInsideShulker(stored)) {
+                maces.addAll(getMacesFromShulker(stored));
+            } else if (isMaceInsideBundle(stored)) {
+                maces.addAll(getMacesFromBundle(stored));
             }
         }
         return maces;
