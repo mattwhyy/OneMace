@@ -1,26 +1,35 @@
 package net.mattwhyy.onemace;
 
-import net.md_5.bungee.api.chat.ClickEvent;
-import net.md_5.bungee.api.chat.ComponentBuilder;
-import net.md_5.bungee.api.chat.TextComponent;
-import org.bukkit.*;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.event.ClickEvent;
+import net.kyori.adventure.text.event.HoverEvent;
+import net.kyori.adventure.text.format.NamedTextColor;
+import net.kyori.adventure.text.format.TextDecoration;
+import org.bukkit.Bukkit;
+import org.bukkit.ChatColor;
+import org.bukkit.Chunk;
+import org.bukkit.Location;
+import org.bukkit.Material;
+import org.bukkit.OfflinePlayer;
+import org.bukkit.World;
 import org.bukkit.block.BlockState;
-import org.bukkit.block.Container;
-import org.bukkit.block.ShulkerBox;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabCompleter;
-import org.bukkit.entity.*;
-import org.bukkit.entity.minecart.StorageMinecart;
-import org.bukkit.inventory.Inventory;
+import org.bukkit.entity.Entity;
+import org.bukkit.entity.Item;
+import org.bukkit.entity.LivingEntity;
+import org.bukkit.entity.Player;
+import org.bukkit.inventory.EntityEquipment;
+import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemStack;
-import org.bukkit.inventory.meta.BlockStateMeta;
-import org.bukkit.inventory.meta.BundleMeta;
-import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.util.StringUtil;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.UUID;
 
 public class OneMaceCommand implements CommandExecutor, TabCompleter {
     private final OneMace plugin;
@@ -37,10 +46,8 @@ public class OneMaceCommand implements CommandExecutor, TabCompleter {
             return true;
         }
 
-
         if (args[0].equalsIgnoreCase("locate")) {
             boolean allowAll = plugin.getConfig().getBoolean("settings.allow-locate-for-all", false);
-
             if (!allowAll && !sender.hasPermission("onemace.admin")) {
                 sender.sendMessage(ChatColor.RED + "You do not have permission to use this command.");
                 return true;
@@ -75,354 +82,194 @@ public class OneMaceCommand implements CommandExecutor, TabCompleter {
         return true;
     }
 
-    private void sendTeleportMessage(CommandSender sender, String message, Location loc) {
-        String coords = ChatColor.GOLD + "X: " + loc.getBlockX()
-                + " Y: " + loc.getBlockY()
-                + " Z: " + loc.getBlockZ()
-                + ChatColor.GRAY + " in world " + loc.getWorld().getName();
+    private void sendTeleportMessage(CommandSender sender, String message, Location location) {
+        Component base = Component.text(message + " ", NamedTextColor.YELLOW)
+                .append(Component.text(
+                        "X: " + location.getBlockX()
+                                + " Y: " + location.getBlockY()
+                                + " Z: " + location.getBlockZ(),
+                        NamedTextColor.GOLD
+                ))
+                .append(Component.text(" in world " + location.getWorld().getName(), NamedTextColor.GRAY));
 
         if (sender instanceof Player player && player.isOp()) {
-
-            String command = "/tp " + loc.getBlockX() + " " + loc.getBlockY() + " " + loc.getBlockZ();
-
-            TextComponent text = new TextComponent(TextComponent.fromLegacyText(message + " " + coords + " "));
-
-            TextComponent click = new TextComponent("[TELEPORT]");
-            click.setColor(ChatColor.GREEN.asBungee());
-            click.setBold(true);
-
-            click.setClickEvent(new ClickEvent(
-                    ClickEvent.Action.SUGGEST_COMMAND,
-                    command
-            ));
-            click.setHoverEvent(new net.md_5.bungee.api.chat.HoverEvent(
-                    net.md_5.bungee.api.chat.HoverEvent.Action.SHOW_TEXT,
-                    new ComponentBuilder("Click to teleport").create()
-            ));
-
-            player.spigot().sendMessage(text, click);
+            String command = "/tp " + location.getBlockX() + " " + location.getBlockY() + " " + location.getBlockZ();
+            Component teleport = Component.text(" [TELEPORT]", NamedTextColor.GREEN, TextDecoration.BOLD)
+                    .clickEvent(ClickEvent.suggestCommand(command))
+                    .hoverEvent(HoverEvent.showText(Component.text("Click to teleport")));
+            player.sendMessage(base.append(teleport));
         } else {
-            sender.sendMessage(message + " " + coords);
+            sender.sendMessage(base);
         }
     }
 
     private void sendPlayerTeleport(CommandSender sender, Player target, String where) {
-        if (!(sender instanceof Player p)) return;
+        Component base = Component.text("The Mace is in ", NamedTextColor.GREEN)
+                .append(Component.text(target.getName() + "'s " + where, NamedTextColor.AQUA));
 
-        if (p.isOp()) {
-            String cmd = "/tp " + target.getName();
-
-            TextComponent msg = new TextComponent(ChatColor.GREEN + "The Mace is in "
-                    + ChatColor.AQUA + target.getName() + "'s " + where + " ");
-
-            TextComponent click = new TextComponent("[TELEPORT]");
-            click.setColor(ChatColor.GREEN.asBungee());
-            click.setBold(true);
-            click.setClickEvent(new ClickEvent(
-                    ClickEvent.Action.SUGGEST_COMMAND,
-                    cmd
-            ));
-            click.setHoverEvent(new net.md_5.bungee.api.chat.HoverEvent(
-                    net.md_5.bungee.api.chat.HoverEvent.Action.SHOW_TEXT,
-                    new ComponentBuilder("Click to teleport").create()
-            ));
-
-            p.spigot().sendMessage(msg, click);
+        if (sender instanceof Player player && player.isOp()) {
+            Component teleport = Component.text(" [TELEPORT]", NamedTextColor.GREEN, TextDecoration.BOLD)
+                    .clickEvent(ClickEvent.suggestCommand("/tp " + target.getName()))
+                    .hoverEvent(HoverEvent.showText(Component.text("Click to teleport")));
+            player.sendMessage(base.append(teleport));
         } else {
-            p.sendMessage(ChatColor.GREEN + "The Mace is in " + ChatColor.AQUA + target.getName() + "'s " + where + ".");
+            sender.sendMessage(base);
         }
     }
 
     private void fixDuplicateMaces(CommandSender sender) {
-        List<ItemStack> foundMaces = new ArrayList<>();
-        List<ItemStack> duplicates = new ArrayList<>();
-
         sender.sendMessage(ChatColor.YELLOW + "Running Mace scan...");
 
+        MaceStorageUtil.CleanupState cleanup = new MaceStorageUtil.CleanupState();
+
         for (Player player : Bukkit.getOnlinePlayers()) {
-            for (ItemStack item : player.getInventory().getContents()) {
-                if (isAnyMace(item)) foundMaces.add(item);
-                else if (isMaceInsideShulker(item)) foundMaces.addAll(getMacesFromShulker(item));
-                else if (isMaceInsideBundle(item)) foundMaces.addAll(getMacesFromBundle(item));
-            }
-            for (ItemStack item : player.getEnderChest().getContents()) {
-                if (isAnyMace(item)) foundMaces.add(item);
-                else if (isMaceInsideShulker(item)) foundMaces.addAll(getMacesFromShulker(item));
-                else if (isMaceInsideBundle(item)) foundMaces.addAll(getMacesFromBundle(item));
-            }
+            MaceStorageUtil.removeExtraMaces(player.getInventory(), cleanup);
+            MaceStorageUtil.removeExtraMaces(player.getEnderChest(), cleanup);
         }
 
         for (World world : Bukkit.getWorlds()) {
             for (Entity entity : world.getEntities()) {
-                if (entity instanceof AbstractHorse horse) {
-                    for (ItemStack item : horse.getInventory().getContents()) {
-                        if (isAnyMace(item)) foundMaces.add(item);
-                        else if (isMaceInsideShulker(item)) foundMaces.addAll(getMacesFromShulker(item));
-                        else if (isMaceInsideBundle(item)) foundMaces.addAll(getMacesFromBundle(item));
-                    }
-                }
-            }
-        }
+                if (entity instanceof Player) continue;
 
-        for (World world : Bukkit.getWorlds()) {
-            for (Entity entity : world.getEntities()) {
                 if (entity instanceof Item item) {
-                    ItemStack droppedItem = item.getItemStack();
-                    if (isAnyMace(droppedItem)) foundMaces.add(droppedItem);
-                    else if (isMaceInsideShulker(droppedItem)) foundMaces.addAll(getMacesFromShulker(droppedItem));
-                    else if (isMaceInsideBundle(droppedItem)) foundMaces.addAll(getMacesFromBundle(droppedItem));
+                    ItemStack cleaned = MaceStorageUtil.removeExtraMaces(item.getItemStack(), cleanup);
+                    if (cleaned == null || cleaned.getType().isAir()) {
+                        item.remove();
+                    } else {
+                        item.setItemStack(cleaned);
+                    }
+                    continue;
+                }
+
+                if (entity instanceof InventoryHolder holder) {
+                    MaceStorageUtil.removeExtraMaces(holder.getInventory(), cleanup);
+                }
+
+                if (entity instanceof LivingEntity living && !(entity instanceof InventoryHolder)) {
+                    cleanEquipment(living.getEquipment(), cleanup);
                 }
             }
-        }
 
-        for (World world : Bukkit.getWorlds()) {
             for (Chunk chunk : world.getLoadedChunks()) {
                 for (BlockState state : chunk.getTileEntities()) {
-                    if (state instanceof Container container) {
-                        for (ItemStack item : container.getInventory().getContents()) {
-                            if (isAnyMace(item)) foundMaces.add(item);
-                            else if (isMaceInsideShulker(item)) foundMaces.addAll(getMacesFromShulker(item));
-                            else if (isMaceInsideBundle(item)) foundMaces.addAll(getMacesFromBundle(item));
-                        }
+                    if (state instanceof InventoryHolder holder) {
+                        MaceStorageUtil.removeExtraMaces(holder.getInventory(), cleanup);
                     }
                 }
             }
         }
 
-        for (World world : Bukkit.getWorlds()) {
-            for (Entity entity : world.getEntities()) {
-                if (entity instanceof StorageMinecart minecart) {
-                    for (ItemStack item : minecart.getInventory().getContents()) {
-                        if (isAnyMace(item)) foundMaces.add(item);
-                        else if (isMaceInsideShulker(item)) foundMaces.addAll(getMacesFromShulker(item));
-                        else if (isMaceInsideBundle(item)) foundMaces.addAll(getMacesFromBundle(item));
-                    }
-                }
-                if (entity instanceof ChestBoat chestBoat) {
-                    for (ItemStack item : chestBoat.getInventory().getContents()) {
-                        if (isAnyMace(item)) foundMaces.add(item);
-                        else if (isMaceInsideShulker(item)) foundMaces.addAll(getMacesFromShulker(item));
-                        else if (isMaceInsideBundle(item)) foundMaces.addAll(getMacesFromBundle(item));
-                    }
-                }
+        if (!cleanup.keptOne()) {
+            if (plugin.hasOfflineMaceRecord()) {
+                plugin.lockMaceCrafting();
+                plugin.saveConfig();
+                sender.sendMessage(ChatColor.YELLOW + "A Mace is recorded in an offline player's inventory. Crafting remains disabled.");
+                sender.sendMessage(ChatColor.GRAY + "/onemace fix cannot inspect an offline player's inventory until they join.");
+                return;
             }
-        }
 
-        if (foundMaces.isEmpty()) {
             sender.sendMessage(ChatColor.GREEN + "No Mace found. Enabling crafting.");
             plugin.resetMaceCrafting(true);
+            plugin.saveConfig();
             return;
         }
 
-        ItemStack officialMace = foundMaces.get(0);
-        plugin.markMace(officialMace);
-        sender.sendMessage(ChatColor.GREEN + "Removed all duplicate Maces (if they existed).");
-
-        for (int i = 1; i < foundMaces.size(); i++) {
-            duplicates.add(foundMaces.get(i));
-        }
-
-        for (ItemStack duplicate : duplicates) {
-            duplicate.setAmount(0);
-        }
-
-        plugin.getConfig().set("settings.mace-crafted", true);
+        plugin.lockMaceCrafting();
         plugin.saveConfig();
 
-        Bukkit.getScheduler().runTask(plugin, plugin::removeAllMaceRecipes);
+        if (cleanup.removed() > 0) {
+            sender.sendMessage(ChatColor.GREEN + "Removed " + cleanup.removed() + " duplicate Mace"
+                    + (cleanup.removed() == 1 ? "." : "s."));
+        } else {
+            sender.sendMessage(ChatColor.GREEN + "One Mace found. No duplicates needed removing.");
+        }
+
+        if (plugin.hasOfflineMaceRecord()) {
+            sender.sendMessage(ChatColor.YELLOW + "An offline-player Mace record also exists, so an offline duplicate may still remain.");
+        }
+
         sender.sendMessage(ChatColor.RED + "Recipe removed to prevent further crafting.");
     }
 
+    private void cleanEquipment(EntityEquipment equipment, MaceStorageUtil.CleanupState cleanup) {
+        if (equipment == null) return;
 
-    private boolean isAnyMace(ItemStack item) {
-        return item != null && item.getType() == Material.MACE;
+        ItemStack mainHand = MaceStorageUtil.removeExtraMaces(equipment.getItemInMainHand(), cleanup);
+        ItemStack offHand = MaceStorageUtil.removeExtraMaces(equipment.getItemInOffHand(), cleanup);
+        equipment.setItemInMainHand(mainHand == null ? new ItemStack(Material.AIR) : mainHand);
+        equipment.setItemInOffHand(offHand == null ? new ItemStack(Material.AIR) : offHand);
     }
 
     private void locateMace(CommandSender sender) {
         for (Player player : Bukkit.getOnlinePlayers()) {
-            for (ItemStack item : player.getInventory().getContents()) {
-                if (isAnyMace(item) || isMaceInsideShulker(item) || isMaceInsideBundle(item))  {
-                    sendPlayerTeleport(sender, player, "Inventory");
-                    return;
-                }
+            if (plugin.containsMace(player.getInventory())) {
+                sendPlayerTeleport(sender, player, "Inventory");
+                return;
             }
-            for (ItemStack item : player.getEnderChest().getContents()) {
-                if (isAnyMace(item) || isMaceInsideShulker(item) || isMaceInsideBundle(item)) {
-                    sendPlayerTeleport(sender, player, "Ender Chest");
-                    return;
-                }
+            if (plugin.containsMace(player.getEnderChest())) {
+                sendPlayerTeleport(sender, player, "Ender Chest");
+                return;
             }
         }
 
         for (World world : Bukkit.getWorlds()) {
             for (Entity entity : world.getEntities()) {
-                if (entity instanceof AbstractHorse horse) {
-                    for (ItemStack item : horse.getInventory().getContents()) {
-                        if (isAnyMace(item) || isMaceInsideShulker(item) || isMaceInsideBundle(item)) {
-                            sendTeleportMessage(sender,
-                                    ChatColor.YELLOW + "The Mace is in a storage animal at",
-                                    entity.getLocation());
-                            return;
-                        }
-                    }
+                if (entity instanceof Player) continue;
+
+                if (entity instanceof Item item && plugin.containsMace(item.getItemStack())) {
+                    sendTeleportMessage(sender, "The Mace is dropped at", entity.getLocation());
+                    return;
+                }
+
+                if (entity instanceof InventoryHolder holder && plugin.containsMace(holder.getInventory())) {
+                    sendTeleportMessage(sender, "The Mace is in an entity inventory at", entity.getLocation());
+                    return;
+                }
+
+                if (entity instanceof LivingEntity living && equipmentContainsMace(living.getEquipment())) {
+                    sendTeleportMessage(sender, "The Mace is held by an entity at", entity.getLocation());
+                    return;
                 }
             }
-        }
 
-        for (World world : Bukkit.getWorlds()) {
-            for (Entity entity : world.getEntities()) {
-                if (entity instanceof Item item) {
-                    ItemStack droppedItem = item.getItemStack();
-                    if (isAnyMace(droppedItem) || isMaceInsideShulker(droppedItem) || isMaceInsideBundle(droppedItem)) {
-                        Location loc = entity.getLocation();
-                        sendTeleportMessage(sender,
-                                ChatColor.YELLOW + "The Mace is dropped at",
-                                loc);
+            for (Chunk chunk : world.getLoadedChunks()) {
+                for (BlockState state : chunk.getTileEntities()) {
+                    if (state instanceof InventoryHolder holder && plugin.containsMace(holder.getInventory())) {
+                        sendTeleportMessage(sender, "The Mace is stored in a block inventory at", state.getLocation());
                         return;
                     }
                 }
             }
         }
 
-        for (World world : Bukkit.getWorlds()) {
-            for (Chunk chunk : world.getLoadedChunks()) {
-                for (BlockState state : chunk.getTileEntities()) {
-                    if (state instanceof Container container) {
-                        Inventory inv = container.getInventory();
-                        for (ItemStack item : inv.getContents()) {
-                            if (isAnyMace(item) || isMaceInsideShulker(item) || isMaceInsideBundle(item)) {
-                                Location loc = state.getLocation();
-                                sendTeleportMessage(sender,
-                                        ChatColor.YELLOW + "The Mace is stored in a container at",
-                                        loc);
-                                return;
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        for (World world : Bukkit.getWorlds()) {
-            for (Entity entity : world.getEntities()) {
-                if (entity instanceof StorageMinecart minecart) {
-                    Inventory inv = minecart.getInventory();
-                    for (ItemStack item : inv.getContents()) {
-                        if (isAnyMace(item) || isMaceInsideShulker(item) || isMaceInsideBundle(item)) {
-                            sendTeleportMessage(sender,
-                                    ChatColor.YELLOW + "The Mace is in a storage minecart at",
-                                    entity.getLocation());
-                            return;
-                        }
-                    }
-                }
-            }
-        }
-
-        for (World world : Bukkit.getWorlds()) {
-            for (Entity entity : world.getEntities()) {
-                if (entity instanceof ChestBoat chestBoat) {
-                    Inventory inv = chestBoat.getInventory();
-                    for (ItemStack item : inv.getContents()) {
-                        if (isAnyMace(item) || isMaceInsideShulker(item) || isMaceInsideBundle(item)) {
-                            sendTeleportMessage(sender,
-                                    ChatColor.YELLOW + "The Mace is in a Chest Boat at",
-                                    entity.getLocation());
-                            return;
-                        }
-                    }
-                }
-            }
-        }
-
         if (plugin.getConfig().isConfigurationSection("offline_inventory")) {
-            for (String uuid : plugin.getConfig().getConfigurationSection("offline_inventory").getKeys(true)) {
-                if (plugin.getConfig().getBoolean("offline_inventory." + uuid, false)) {
+            for (String uuid : plugin.getConfig().getConfigurationSection("offline_inventory").getKeys(false)) {
+                if (!plugin.getConfig().getBoolean("offline_inventory." + uuid, false)) continue;
+
+                try {
                     UUID offlineUUID = UUID.fromString(uuid);
                     OfflinePlayer offlinePlayer = Bukkit.getOfflinePlayer(offlineUUID);
                     String name = offlinePlayer.getName();
-
                     if (name != null) {
-                        sender.sendMessage(ChatColor.YELLOW + "The Mace is in " + ChatColor.AQUA + name + ChatColor.YELLOW + "'s inventory (offline).");
+                        sender.sendMessage(ChatColor.YELLOW + "The Mace is in " + ChatColor.AQUA + name
+                                + ChatColor.YELLOW + "'s inventory (offline).");
                     } else {
                         sender.sendMessage(ChatColor.YELLOW + "The Mace is in an offline player's inventory (UUID: " + uuid + ").");
                     }
-                    return;
+                } catch (IllegalArgumentException e) {
+                    sender.sendMessage(ChatColor.YELLOW + "The Mace is recorded in an offline player's inventory.");
                 }
+                return;
             }
         }
 
         sender.sendMessage(ChatColor.RED + "The Mace is either missing or in an unloaded chunk.");
     }
 
-
-    private boolean isMaceInsideShulker(ItemStack item) {
-        if (item == null || item.getType() != Material.SHULKER_BOX) {
-            return false;
-        }
-
-        ItemMeta meta = item.getItemMeta();
-        if (meta instanceof BlockStateMeta blockStateMeta) {
-            if (blockStateMeta.getBlockState() instanceof ShulkerBox shulkerBox) {
-                Inventory shulkerInv = shulkerBox.getInventory();
-                for (ItemStack storedItem : shulkerInv.getContents()) {
-                    if (plugin.isMace(storedItem)) {
-                        return true;
-                    }
-                }
-            }
-        }
-        return false;
-    }
-
-
-    private List<ItemStack> getMacesFromShulker(ItemStack item) {
-        List<ItemStack> maces = new ArrayList<>();
-        if (item == null || item.getType() != Material.SHULKER_BOX) {
-            return maces;
-        }
-
-        BlockStateMeta meta = (BlockStateMeta) item.getItemMeta();
-        if (meta == null || !(meta.getBlockState() instanceof ShulkerBox shulkerBox)) {
-            return maces;
-        }
-
-        Inventory shulkerInv = shulkerBox.getInventory();
-        for (ItemStack storedItem : shulkerInv.getContents()) {
-            if (isAnyMace(storedItem)) {
-                maces.add(storedItem);
-            }
-        }
-        return maces;
-    }
-
-    private boolean isMaceInsideBundle(ItemStack item) {
-        if (item == null || !(item.getItemMeta() instanceof BundleMeta bundleMeta)) {
-            return false;
-        }
-        for (ItemStack stored : bundleMeta.getItems()) {
-            if (isAnyMace(stored) || isMaceInsideShulker(stored) || isMaceInsideBundle(stored)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private List<ItemStack> getMacesFromBundle(ItemStack item) {
-        List<ItemStack> maces = new ArrayList<>();
-        if (item == null || !(item.getItemMeta() instanceof BundleMeta bundleMeta)) {
-            return maces;
-        }
-        for (ItemStack stored : bundleMeta.getItems()) {
-            if (isAnyMace(stored)) {
-                maces.add(stored);
-            } else if (isMaceInsideShulker(stored)) {
-                maces.addAll(getMacesFromShulker(stored));
-            } else if (isMaceInsideBundle(stored)) {
-                maces.addAll(getMacesFromBundle(stored));
-            }
-        }
-        return maces;
+    private boolean equipmentContainsMace(EntityEquipment equipment) {
+        return equipment != null
+                && (plugin.containsMace(equipment.getItemInMainHand())
+                || plugin.containsMace(equipment.getItemInOffHand()));
     }
 
     @Override
