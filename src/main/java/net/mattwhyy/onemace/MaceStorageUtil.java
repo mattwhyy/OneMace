@@ -72,6 +72,10 @@ final class MaceStorageUtil {
         removeExtraMaces(inventory, state, 0);
     }
 
+    static ItemStack removeExtraMaces(ItemStack item, CleanupState state) {
+        return removeExtraMaces(item, state, 0);
+    }
+
     private static void removeExtraMaces(Inventory inventory, CleanupState state, int depth) {
         if (inventory == null || depth > MAX_NESTING_DEPTH) return;
 
