@@ -19,14 +19,12 @@ jobs:
             java: '21'
             test-jvm: '21'
             paper-api: '1.21-R0.1-SNAPSHOT'
-            mock-artifact: 'mockbukkit-v1.21'
-            mock-version: '4.116.3'
+            mockbukkit: 'com.github.seeseemelk:MockBukkit-v1.21:3.117.0'
           - name: Paper 26.2 / Java 25
             java: '25'
             test-jvm: '25'
             paper-api: '26.2.build.121-stable'
-            mock-artifact: 'mockbukkit-v26.2'
-            mock-version: '4.116.1'
+            mockbukkit: 'org.mockbukkit.mockbukkit:mockbukkit-v26.2:4.116.1'
 
     steps:
       - name: Checkout
@@ -48,5 +46,4 @@ jobs:
           gradle clean test build --stacktrace --no-daemon
           -PtestJvmVersion=${{ matrix.test-jvm }}
           -PtestPaperApiVersion=${{ matrix.paper-api }}
-          -PmockBukkitArtifact=${{ matrix.mock-artifact }}
-          -PmockBukkitVersion=${{ matrix.mock-version }}
+          -PmockBukkitDependency=${{ matrix.mockbukkit }}
