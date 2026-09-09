@@ -27,9 +27,12 @@ final class MaceStorageUtil {
     }
 
     static boolean isShelf(Material material) {
-        if (material == null) return false;
-        String name = material.name();
-        return name.equals("SHELF") || name.endsWith("_SHELF");
+        return material != null && isShelfName(material.name());
+    }
+
+    static boolean isShelfName(String materialName) {
+        if (materialName == null) return false;
+        return materialName.equals("SHELF") || materialName.endsWith("_SHELF");
     }
 
     static boolean containsMace(Inventory inventory) {
