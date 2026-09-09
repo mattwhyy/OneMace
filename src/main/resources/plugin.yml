@@ -8,7 +8,7 @@ website: https://modrinth.com/plugin/onemace
 commands:
   onemace:
     description: OneMace administration command
-    usage: /onemace <locate|fix|reload>
+    usage: /onemace <locate|info|fix>
     permission: onemace.admin
 permissions:
   onemace.admin:
