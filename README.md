@@ -71,14 +71,16 @@ Basic information about the plugin.
 none
 
 ## Setup
-OneMace 1.08 targets **Paper 26.2**. Paper 26.2 requires **Java 25**.
+OneMace 1.08 supports **Paper-based Minecraft servers from 1.21 through 26.2** with one plugin jar.
+
+The plugin is compiled for **Java 21**, so it can run on the Java 21 runtime used by older supported servers as well as newer Java runtimes. Use the Java version required by your Minecraft/Paper version.
 
 Put the ```jar``` file into your server's **plugins** folder.
 
 **Restart** the server.
 
 ## Bypasses & Limitations
-⚠️ **Maces in unloaded chunks cannot be scanned directly.** OneMace keeps the recipe disabled when it has evidence that a Mace still exists, including tracked offline-player inventories. `/onemace fix` will not assume an offline Mace is gone just because its player is not online.
+⚠️ **Maces in unloaded chunks cannot be scanned directly.** OneMace keeps crafting disabled when the persisted state says a Mace still exists, including tracked offline-player inventories. `/onemace fix` will not assume the Mace is gone just because it cannot currently be found in loaded chunks.
 
 Otherwise, this plugin should work perfectly on a clean vanilla server.
 ## Contact
