@@ -1,15 +1,15 @@
 package net.mattwhyy.onemace;
 
 import org.bukkit.Material;
+import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.BundleMeta;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockbukkit.mockbukkit.MockBukkit;
-import org.mockbukkit.mockbukkit.ServerMock;
-import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.util.List;
 import java.util.UUID;
 
@@ -18,18 +18,22 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class OneMaceRegressionTest {
-    private ServerMock server;
+    private Class<?> mockBukkit;
+    private Object server;
     private OneMace plugin;
 
     @BeforeEach
-    void setUp() {
-        server = MockBukkit.mock();
-        plugin = MockBukkit.load(OneMace.class);
+    void setUp() throws Exception {
+        mockBukkit = loadMockBukkitClass();
+        server = mockBukkit.getMethod("mock").invoke(null);
+        plugin = (OneMace) findLoadMethod().invoke(null, OneMace.class);
     }
 
     @AfterEach
-    void tearDown() {
-        MockBukkit.unmock();
+    void tearDown() throws Exception {
+        if (mockBukkit != null) {
+            mockBukkit.getMethod("unmock").invoke(null);
+        }
     }
 
     @Test
@@ -53,8 +57,8 @@ class OneMaceRegressionTest {
     }
 
     @Test
-    void duplicateCleanupPersistsInsideBundleMetadata() {
-        PlayerMock player = server.addPlayer();
+    void duplicateCleanupPersistsInsideBundleMetadata() throws Exception {
+        Player player = addPlayer();
         player.getInventory().setItem(0, new ItemStack(Material.MACE));
         player.getInventory().setItem(1, bundleWith(new ItemStack(Material.MACE)));
 
@@ -71,12 +75,12 @@ class OneMaceRegressionTest {
     }
 
     @Test
-    void fixKeepsCraftingDisabledForOfflineMace() {
+    void fixKeepsCraftingDisabledForOfflineMace() throws Exception {
         UUID offlinePlayer = UUID.randomUUID();
         plugin.getConfig().set("offline_inventory." + offlinePlayer, true);
         plugin.lockMaceCrafting();
 
-        PlayerMock admin = server.addPlayer();
+        Player admin = addPlayer();
         admin.setOp(true);
 
         runFix(admin);
@@ -87,10 +91,10 @@ class OneMaceRegressionTest {
     }
 
     @Test
-    void fixDoesNotReenableCraftingWhenCraftedMaceMayBeUnloaded() {
+    void fixDoesNotReenableCraftingWhenCraftedMaceMayBeUnloaded() throws Exception {
         plugin.lockMaceCrafting();
 
-        PlayerMock admin = server.addPlayer();
+        Player admin = addPlayer();
         admin.setOp(true);
 
         runFix(admin);
@@ -99,10 +103,35 @@ class OneMaceRegressionTest {
         assertTrue(plugin.getConfig().getBoolean("settings.mace-crafted"));
     }
 
-    private void runFix(PlayerMock admin) {
+    private Class<?> loadMockBukkitClass() throws ClassNotFoundException {
+        try {
+            return Class.forName("org.mockbukkit.mockbukkit.MockBukkit");
+        } catch (ClassNotFoundException ignored) {
+            return Class.forName("be.seeseemelk.mockbukkit.MockBukkit");
+        }
+    }
+
+    private Method findLoadMethod() throws NoSuchMethodException {
+        for (Method method : mockBukkit.getMethods()) {
+            if (method.getName().equals("load")
+                    && method.getParameterCount() == 1
+                    && method.getParameterTypes()[0] == Class.class) {
+                return method;
+            }
+        }
+        throw new NoSuchMethodException("MockBukkit.load(Class)");
+    }
+
+    private Player addPlayer() throws NoSuchMethodException, InvocationTargetException, IllegalAccessException {
+        return (Player) server.getClass().getMethod("addPlayer").invoke(server);
+    }
+
+    private void runFix(Player admin) throws Exception {
         OneMaceCommand command = new OneMaceCommand(plugin);
         command.onCommand(admin, plugin.getCommand("onemace"), "onemace", new String[]{"fix"});
-        server.getScheduler().performOneTick();
+
+        Object scheduler = server.getClass().getMethod("getScheduler").invoke(server);
+        scheduler.getClass().getMethod("performOneTick").invoke(scheduler);
     }
 
     private ItemStack bundleWith(ItemStack... contents) {
