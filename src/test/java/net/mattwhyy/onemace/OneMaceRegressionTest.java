@@ -45,10 +45,11 @@ class OneMaceRegressionTest {
     }
 
     @Test
-    void recognizesShelfMaterials() {
-        assertTrue(MaceStorageUtil.isShelf(Material.OAK_SHELF));
-        assertTrue(MaceStorageUtil.isShelf(Material.SPRUCE_SHELF));
-        assertFalse(MaceStorageUtil.isShelf(Material.OAK_PLANKS));
+    void recognizesShelfNamesWithoutNewApiConstants() {
+        assertTrue(MaceStorageUtil.isShelfName("SHELF"));
+        assertTrue(MaceStorageUtil.isShelfName("OAK_SHELF"));
+        assertTrue(MaceStorageUtil.isShelfName("SPRUCE_SHELF"));
+        assertFalse(MaceStorageUtil.isShelfName("OAK_PLANKS"));
     }
 
     @Test
@@ -78,12 +79,30 @@ class OneMaceRegressionTest {
         PlayerMock admin = server.addPlayer();
         admin.setOp(true);
 
+        runFix(admin);
+
+        assertTrue(plugin.isMaceCrafted());
+        assertTrue(plugin.getConfig().getBoolean("settings.mace-crafted"));
+        assertTrue(plugin.getConfig().getBoolean("offline_inventory." + offlinePlayer));
+    }
+
+    @Test
+    void fixDoesNotReenableCraftingWhenCraftedMaceMayBeUnloaded() {
+        plugin.lockMaceCrafting();
+
+        PlayerMock admin = server.addPlayer();
+        admin.setOp(true);
+
+        runFix(admin);
+
+        assertTrue(plugin.isMaceCrafted());
+        assertTrue(plugin.getConfig().getBoolean("settings.mace-crafted"));
+    }
+
+    private void runFix(PlayerMock admin) {
         OneMaceCommand command = new OneMaceCommand(plugin);
         command.onCommand(admin, plugin.getCommand("onemace"), "onemace", new String[]{"fix"});
         server.getScheduler().performOneTick();
-
-        assertTrue(plugin.getConfig().getBoolean("settings.mace-crafted"));
-        assertTrue(plugin.getConfig().getBoolean("offline_inventory." + offlinePlayer));
     }
 
     private ItemStack bundleWith(ItemStack... contents) {
