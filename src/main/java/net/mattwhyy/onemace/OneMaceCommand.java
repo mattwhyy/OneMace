@@ -19,6 +19,7 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Item;
+import org.bukkit.entity.ItemFrame;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.EntityEquipment;
@@ -29,6 +30,7 @@ import org.bukkit.util.StringUtil;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 
 public class OneMaceCommand implements CommandExecutor, TabCompleter {
@@ -90,7 +92,7 @@ public class OneMaceCommand implements CommandExecutor, TabCompleter {
                                 + " Z: " + location.getBlockZ(),
                         NamedTextColor.GOLD
                 ))
-                .append(Component.text(" in world " + location.getWorld().getName(), NamedTextColor.GRAY));
+                .append(Component.text(" in world " + Objects.requireNonNull(location.getWorld()).getName(), NamedTextColor.GRAY));
 
         if (sender instanceof Player player && player.isOp()) {
             String command = "/tp " + location.getBlockX() + " " + location.getBlockY() + " " + location.getBlockZ();
@@ -141,6 +143,12 @@ public class OneMaceCommand implements CommandExecutor, TabCompleter {
                     continue;
                 }
 
+                if (entity instanceof ItemFrame frame) {
+                    ItemStack cleaned = MaceStorageUtil.removeExtraMaces(frame.getItem(), cleanup);
+                    frame.setItem(cleaned == null ? new ItemStack(Material.AIR) : cleaned);
+                    continue;
+                }
+
                 if (entity instanceof InventoryHolder holder) {
                     MaceStorageUtil.removeExtraMaces(holder.getInventory(), cleanup);
                 }
@@ -165,6 +173,14 @@ public class OneMaceCommand implements CommandExecutor, TabCompleter {
                 plugin.saveConfig();
                 sender.sendMessage(ChatColor.YELLOW + "A Mace is recorded in an offline player's inventory. Crafting remains disabled.");
                 sender.sendMessage(ChatColor.GRAY + "/onemace fix cannot inspect an offline player's inventory until they join.");
+                return;
+            }
+
+            if (plugin.isMaceCrafted()) {
+                plugin.removeAllMaceRecipes();
+                plugin.saveConfig();
+                sender.sendMessage(ChatColor.YELLOW + "No loaded Mace found. Crafting remains disabled because a Mace is still recorded as crafted.");
+                sender.sendMessage(ChatColor.GRAY + "This prevents a duplicate if the Mace is currently in an unloaded chunk.");
                 return;
             }
 
@@ -221,6 +237,11 @@ public class OneMaceCommand implements CommandExecutor, TabCompleter {
                     return;
                 }
 
+                if (entity instanceof ItemFrame frame && plugin.containsMace(frame.getItem())) {
+                    sendTeleportMessage(sender, "The Mace is in an item frame at", entity.getLocation());
+                    return;
+                }
+
                 if (entity instanceof InventoryHolder holder && plugin.containsMace(holder.getInventory())) {
                     sendTeleportMessage(sender, "The Mace is in an entity inventory at", entity.getLocation());
                     return;
@@ -243,7 +264,7 @@ public class OneMaceCommand implements CommandExecutor, TabCompleter {
         }
 
         if (plugin.getConfig().isConfigurationSection("offline_inventory")) {
-            for (String uuid : plugin.getConfig().getConfigurationSection("offline_inventory").getKeys(false)) {
+            for (String uuid : Objects.requireNonNull(plugin.getConfig().getConfigurationSection("offline_inventory")).getKeys(false)) {
                 if (!plugin.getConfig().getBoolean("offline_inventory." + uuid, false)) continue;
 
                 try {
