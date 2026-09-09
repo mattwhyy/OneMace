@@ -1,7 +1,6 @@
 package net.mattwhyy.onemace;
 
 import com.destroystokyo.paper.event.entity.EntityRemoveFromWorldEvent;
-import io.papermc.paper.entity.RemovalReason;
 import io.papermc.paper.event.player.PlayerItemFrameChangeEvent;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
@@ -21,6 +20,7 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.block.CrafterCraftEvent;
+import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.EntityPickupItemEvent;
 import org.bukkit.event.entity.ItemDespawnEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
@@ -52,6 +52,7 @@ import org.bukkit.scoreboard.Team;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
@@ -61,13 +62,13 @@ public class OneMace extends JavaPlugin implements Listener {
     private boolean configDirty;
     private final NamespacedKey maceKey = new NamespacedKey(this, "mace-tracker");
 
-    private final Set<InventoryType> mandatoryContainers = Set.of(
-            InventoryType.PLAYER,
-            InventoryType.CRAFTING,
-            InventoryType.WORKBENCH,
-            InventoryType.CREATIVE
+    private final Set<String> mandatoryContainers = Set.of(
+            "PLAYER",
+            "CRAFTING",
+            "WORKBENCH",
+            "CREATIVE"
     );
-    private final Set<InventoryType> allowedContainers = new HashSet<>();
+    private final Set<String> allowedContainers = new HashSet<>();
 
     @Override
     public void onEnable() {
@@ -155,16 +156,30 @@ public class OneMace extends JavaPlugin implements Listener {
 
         List<String> containerNames = getConfig().getStringList("settings.optional-allowed-containers");
         for (String name : containerNames) {
-            try {
-                allowedContainers.add(InventoryType.valueOf(name.toUpperCase()));
-            } catch (IllegalArgumentException e) {
+            String normalized = name.toUpperCase(Locale.ROOT);
+            if (isKnownContainerName(normalized) || normalized.equals("SHELF")) {
+                allowedContainers.add(normalized);
+            } else {
                 getLogger().warning("[OneMace] Invalid optional inventory type in config: " + name);
             }
         }
     }
 
+    private boolean isKnownContainerName(String name) {
+        try {
+            InventoryType.valueOf(name);
+            return true;
+        } catch (IllegalArgumentException e) {
+            return false;
+        }
+    }
+
     private boolean isAllowedContainer(InventoryType type) {
-        return allowedContainers.contains(type);
+        return type != null && allowedContainers.contains(type.name());
+    }
+
+    private boolean isAllowedContainerName(String name) {
+        return allowedContainers.contains(name);
     }
 
     public boolean isMace(ItemStack item) {
@@ -186,7 +201,7 @@ public class OneMace extends JavaPlugin implements Listener {
     public boolean hasOfflineMaceRecord() {
         if (!getConfig().isConfigurationSection("offline_inventory")) return false;
 
-        for (String uuid : getConfig().getConfigurationSection("offline_inventory").getKeys(false)) {
+        for (String uuid : Objects.requireNonNull(getConfig().getConfigurationSection("offline_inventory")).getKeys(false)) {
             if (getConfig().getBoolean("offline_inventory." + uuid, false)) return true;
         }
         return false;
@@ -542,12 +557,21 @@ public class OneMace extends JavaPlugin implements Listener {
         }
     }
 
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onDroppedMaceDamage(EntityDamageEvent event) {
+        if (!(event.getEntity() instanceof Item item) || !containsMace(item.getItemStack())) return;
+
+        Bukkit.getScheduler().runTaskLater(this, () -> {
+            if (!hasKnownMace()) {
+                resetMaceCrafting(true);
+            }
+        }, 2L);
+    }
+
     @EventHandler
     public void onItemRemoved(EntityRemoveFromWorldEvent event) {
         if (!(event.getEntity() instanceof Item item) || !containsMace(item.getItemStack())) return;
-
-        RemovalReason reason = item.getRemovalReason();
-        if (reason == null || !reason.shouldDestroy()) return;
+        if (!PaperCompat.isDestructiveRemoval(item)) return;
 
         scheduleLossAudit();
     }
@@ -567,14 +591,12 @@ public class OneMace extends JavaPlugin implements Listener {
         Block block = event.getClickedBlock();
         if (block == null || !containsMace(event.getItem())) return;
 
-        InventoryType type = null;
-        if (block.getType() == Material.DECORATED_POT) {
-            type = InventoryType.DECORATED_POT;
-        } else if (MaceStorageUtil.isShelf(block.getType())) {
-            type = InventoryType.SHELF;
+        if (block.getType() == Material.DECORATED_POT && !isAllowedContainer(InventoryType.DECORATED_POT)) {
+            event.setCancelled(true);
+            return;
         }
 
-        if (type != null && !isAllowedContainer(type)) {
+        if (MaceStorageUtil.isShelf(block.getType()) && !isAllowedContainerName("SHELF")) {
             event.setCancelled(true);
         }
     }
@@ -640,7 +662,7 @@ public class OneMace extends JavaPlugin implements Listener {
         Player player = Bukkit.getPlayer(ownerUUID);
         if (player == null) return;
 
-        String colorName = getConfig().getString("settings.mace-name-color", "RED").toUpperCase();
+        String colorName = getConfig().getString("settings.mace-name-color", "RED").toUpperCase(Locale.ROOT);
         try {
             maceTeam.setColor(ChatColor.valueOf(colorName));
         } catch (IllegalArgumentException e) {
