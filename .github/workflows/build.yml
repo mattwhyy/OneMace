@@ -8,8 +8,23 @@ on:
   pull_request:
 
 jobs:
-  build:
+  compatibility:
+    name: ${{ matrix.name }}
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Paper 1.21 / Java 21
+            java: '21'
+            paper-api: '1.21-R0.1-SNAPSHOT'
+            mock-artifact: 'mockbukkit-v1.21'
+            mock-version: '4.116.3'
+          - name: Paper 26.2 / Java 25
+            java: '25'
+            paper-api: '26.2.build.121-stable'
+            mock-artifact: 'mockbukkit-v26.2'
+            mock-version: '4.116.1'
 
     steps:
       - name: Checkout
@@ -19,7 +34,7 @@ jobs:
         uses: actions/setup-java@v5
         with:
           distribution: temurin
-          java-version: '25'
+          java-version: ${{ matrix.java }}
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
@@ -27,4 +42,8 @@ jobs:
           gradle-version: '9.7.1'
 
       - name: Test and build
-        run: gradle clean test build --stacktrace --no-daemon
+        run: >-
+          gradle clean test build --stacktrace --no-daemon
+          -PpaperApiVersion=${{ matrix.paper-api }}
+          -PmockBukkitArtifact=${{ matrix.mock-artifact }}
+          -PmockBukkitVersion=${{ matrix.mock-version }}
