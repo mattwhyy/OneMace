@@ -1,8 +1,12 @@
 name: onemace
-version: '1.07'
+version: '${version}'
 main: net.mattwhyy.onemace.OneMace
-api-version: '1.21'
+api-version: '26.2'
 commands:
   onemace:
     description: Main command for OneMace
     usage: /onemace <subcommand>
+permissions:
+  onemace.admin:
+    description: Allows using OneMace admin subcommands
+    default: op
