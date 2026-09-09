@@ -13,13 +13,17 @@ repositories {
     }
 }
 
-dependencies {
-    compileOnly('io.papermc.paper:paper-api:1.21-R0.1-SNAPSHOT')
+def paperApiVersion = providers.gradleProperty('paperApiVersion').getOrElse('1.21-R0.1-SNAPSHOT')
+def mockBukkitArtifact = providers.gradleProperty('mockBukkitArtifact').getOrElse('mockbukkit-v1.21')
+def mockBukkitVersion = providers.gradleProperty('mockBukkitVersion').getOrElse('4.116.3')
 
-    testImplementation('io.papermc.paper:paper-api:1.21-R0.1-SNAPSHOT')
+dependencies {
+    compileOnly("io.papermc.paper:paper-api:${paperApiVersion}")
+
+    testImplementation("io.papermc.paper:paper-api:${paperApiVersion}")
     testImplementation('org.junit.jupiter:junit-jupiter:5.13.4')
     testRuntimeOnly('org.junit.platform:junit-platform-launcher:1.13.4')
-    testImplementation('org.mockbukkit.mockbukkit:mockbukkit-v1.21:4.116.1')
+    testImplementation("org.mockbukkit.mockbukkit:${mockBukkitArtifact}:${mockBukkitVersion}")
 }
 
 def targetJavaVersion = 21
@@ -27,7 +31,9 @@ java {
     def javaVersion = JavaVersion.toVersion(targetJavaVersion)
     sourceCompatibility = javaVersion
     targetCompatibility = javaVersion
-    toolchain.languageVersion = JavaLanguageVersion.of(targetJavaVersion)
+    if (JavaVersion.current() < javaVersion) {
+        toolchain.languageVersion = JavaLanguageVersion.of(targetJavaVersion)
+    }
 }
 
 tasks.withType(JavaCompile).configureEach {
