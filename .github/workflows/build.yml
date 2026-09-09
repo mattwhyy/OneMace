@@ -17,12 +17,12 @@ jobs:
         include:
           - name: Paper 1.21 / Java 21
             java: '21'
-            paper-api: '1.21-R0.1-SNAPSHOT'
+            test-jvm: '21'
             mock-artifact: 'mockbukkit-v1.21'
             mock-version: '4.116.3'
           - name: Paper 26.2 / Java 25
             java: '25'
-            paper-api: '26.2.build.121-stable'
+            test-jvm: '25'
             mock-artifact: 'mockbukkit-v26.2'
             mock-version: '4.116.1'
 
@@ -44,6 +44,6 @@ jobs:
       - name: Test and build
         run: >-
           gradle clean test build --stacktrace --no-daemon
-          -PpaperApiVersion=${{ matrix.paper-api }}
+          -PtestJvmVersion=${{ matrix.test-jvm }}
           -PmockBukkitArtifact=${{ matrix.mock-artifact }}
           -PmockBukkitVersion=${{ matrix.mock-version }}
