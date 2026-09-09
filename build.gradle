@@ -18,6 +18,7 @@ dependencies {
 
     testImplementation('io.papermc.paper:paper-api:26.2.build.121-stable')
     testImplementation('org.junit.jupiter:junit-jupiter:5.13.4')
+    testRuntimeOnly('org.junit.platform:junit-platform-launcher:1.13.4')
     testImplementation('org.mockbukkit.mockbukkit:mockbukkit-v26.2:4.116.1')
 }
 
