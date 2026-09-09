@@ -572,7 +572,6 @@ public class OneMace extends JavaPlugin implements Listener {
     public void onItemRemoved(EntityRemoveFromWorldEvent event) {
         if (!(event.getEntity() instanceof Item item) || !containsMace(item.getItemStack())) return;
         if (!PaperCompat.isDestructiveRemoval(item)) return;
-
         scheduleLossAudit();
     }
 
