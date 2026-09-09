@@ -16,8 +16,7 @@ repositories {
 }
 
 def testPaperApiVersion = providers.gradleProperty('testPaperApiVersion').getOrElse('1.21-R0.1-SNAPSHOT')
-def mockBukkitArtifact = providers.gradleProperty('mockBukkitArtifact').getOrElse('mockbukkit-v1.21')
-def mockBukkitVersion = providers.gradleProperty('mockBukkitVersion').getOrElse('4.116.3')
+def mockBukkitDependency = providers.gradleProperty('mockBukkitDependency').getOrElse('com.github.seeseemelk:MockBukkit-v1.21:3.117.0')
 def testJvmVersion = providers.gradleProperty('testJvmVersion').map(Integer::parseInt).getOrElse(21)
 
 dependencies {
@@ -26,7 +25,7 @@ dependencies {
     testImplementation("io.papermc.paper:paper-api:${testPaperApiVersion}")
     testImplementation('org.junit.jupiter:junit-jupiter:5.13.4')
     testRuntimeOnly('org.junit.platform:junit-platform-launcher:1.13.4')
-    testImplementation("org.mockbukkit.mockbukkit:${mockBukkitArtifact}:${mockBukkitVersion}")
+    testRuntimeOnly(mockBukkitDependency)
 }
 
 configurations.named('testCompileClasspath') {
