@@ -1,24 +1,38 @@
+import org.gradle.api.attributes.java.TargetJvmVersion
+
 plugins {
     id 'java'
 }
 
 group = 'net.mattwhyy'
-version = '1.07'
+version = '1.08'
 
 repositories {
     mavenCentral()
     maven {
-        name = "papermc"
-        url = "https://repo.papermc.io/repository/maven-public/"
-    }
-    maven {
-        name = "sonatype"
-        url = "https://oss.sonatype.org/content/groups/public/"
+        name = 'papermc'
+        url = 'https://repo.papermc.io/repository/maven-public/'
     }
 }
 
+def testPaperApiVersion = providers.gradleProperty('testPaperApiVersion').getOrElse('1.21-R0.1-SNAPSHOT')
+def mockBukkitDependency = providers.gradleProperty('mockBukkitDependency').getOrElse('com.github.seeseemelk:MockBukkit-v1.21:3.117.0')
+def testJvmVersion = providers.gradleProperty('testJvmVersion').map(Integer::parseInt).getOrElse(21)
+
 dependencies {
     compileOnly('io.papermc.paper:paper-api:1.21-R0.1-SNAPSHOT')
+
+    testImplementation("io.papermc.paper:paper-api:${testPaperApiVersion}")
+    testImplementation('org.junit.jupiter:junit-jupiter:5.13.4')
+    testRuntimeOnly('org.junit.platform:junit-platform-launcher:1.13.4')
+    testRuntimeOnly(mockBukkitDependency)
+}
+
+configurations.named('testCompileClasspath') {
+    attributes.attribute(TargetJvmVersion.TARGET_JVM_VERSION_ATTRIBUTE, testJvmVersion)
+}
+configurations.named('testRuntimeClasspath') {
+    attributes.attribute(TargetJvmVersion.TARGET_JVM_VERSION_ATTRIBUTE, testJvmVersion)
 }
 
 def targetJavaVersion = 21
@@ -33,9 +47,14 @@ java {
 
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
+    options.release.set(targetJavaVersion)
+}
 
-    if (targetJavaVersion >= 10 || JavaVersion.current().isJava10Compatible()) {
-        options.release.set(targetJavaVersion)
+test {
+    useJUnitPlatform()
+    testLogging {
+        events 'failed'
+        exceptionFormat 'full'
     }
 }
 

@@ -1,28 +1,47 @@
 package net.mattwhyy.onemace;
 
 import com.destroystokyo.paper.event.entity.EntityRemoveFromWorldEvent;
-import org.bukkit.*;
+import io.papermc.paper.event.player.PlayerItemFrameChangeEvent;
+import org.bukkit.Bukkit;
+import org.bukkit.ChatColor;
+import org.bukkit.Chunk;
+import org.bukkit.Material;
+import org.bukkit.NamespacedKey;
+import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockState;
-import org.bukkit.block.Container;
-import org.bukkit.block.ShulkerBox;
-import org.bukkit.entity.*;
-import org.bukkit.entity.minecart.StorageMinecart;
+import org.bukkit.entity.Entity;
+import org.bukkit.entity.Item;
+import org.bukkit.entity.ItemFrame;
+import org.bukkit.entity.LivingEntity;
+import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
+import org.bukkit.event.block.Action;
 import org.bukkit.event.block.CrafterCraftEvent;
+import org.bukkit.event.entity.EntityDamageEvent;
+import org.bukkit.event.entity.EntityPickupItemEvent;
 import org.bukkit.event.entity.ItemDespawnEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
-import org.bukkit.event.inventory.*;
+import org.bukkit.event.inventory.CraftItemEvent;
+import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.InventoryDragEvent;
+import org.bukkit.event.inventory.InventoryMoveItemEvent;
+import org.bukkit.event.inventory.InventoryPickupItemEvent;
+import org.bukkit.event.inventory.InventoryType;
+import org.bukkit.event.inventory.PrepareItemCraftEvent;
 import org.bukkit.event.player.PlayerArmorStandManipulateEvent;
-import org.bukkit.event.player.PlayerInteractEntityEvent;
+import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerItemBreakEvent;
+import org.bukkit.event.player.PlayerJoinEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.inventory.EntityEquipment;
 import org.bukkit.inventory.Inventory;
+import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.ShapedRecipe;
-import org.bukkit.inventory.meta.BlockStateMeta;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataContainer;
 import org.bukkit.persistence.PersistentDataType;
@@ -30,11 +49,26 @@ import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scoreboard.Scoreboard;
 import org.bukkit.scoreboard.Team;
 
-import java.util.*;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Objects;
+import java.util.Set;
+import java.util.UUID;
 
 public class OneMace extends JavaPlugin implements Listener {
     private boolean maceCrafted;
+    private boolean configDirty;
     private final NamespacedKey maceKey = new NamespacedKey(this, "mace-tracker");
+
+    private final Set<String> mandatoryContainers = Set.of(
+            "PLAYER",
+            "CRAFTING",
+            "WORKBENCH",
+            "CREATIVE"
+    );
+    private final Set<String> allowedContainers = new HashSet<>();
 
     @Override
     public void onEnable() {
@@ -43,24 +77,37 @@ public class OneMace extends JavaPlugin implements Listener {
         loadAllowedContainers();
         maceCrafted = getConfig().getBoolean("settings.mace-crafted", false);
 
-        Bukkit.getScheduler().runTaskLater(this, () -> {
-            if (fullMaceAudit()) {
-                resetMaceCrafting(false);
-                getConfig().set("offline_inventory", null);
-                saveConfig();
-            } else {
-                removeAllMaceRecipes();
-                getLogger().info("[OneMace] Mace already crafted. Recipes removed.");
-            }
-            }, 40L);
-
         Bukkit.getPluginManager().registerEvents(this, this);
-        getCommand("onemace").setExecutor(new OneMaceCommand(this));
-        getCommand("onemace").setTabCompleter(new OneMaceCommand(this));
+        OneMaceCommand command = new OneMaceCommand(this);
+        Objects.requireNonNull(getCommand("onemace"), "onemace command is missing from plugin.yml").setExecutor(command);
+        Objects.requireNonNull(getCommand("onemace"), "onemace command is missing from plugin.yml").setTabCompleter(command);
+
+        Bukkit.getScheduler().runTaskLater(this, () -> {
+            if (maceCrafted) {
+                removeAllMaceRecipes();
+                getLogger().info("[OneMace] Mace is recorded as crafted. Recipes removed.");
+            } else if (hasKnownMace()) {
+                lockMaceCrafting();
+                getLogger().info("[OneMace] Mace found. Recipes removed.");
+            } else {
+                ensureMaceRecipeAvailable();
+            }
+        }, 40L);
+
         getLogger().info("[OneMace] Plugin enabled!");
     }
 
-    private boolean configDirty = false;
+    @Override
+    public void onDisable() {
+        getLogger().info("[OneMace] Saving offline Mace tracking before shutdown...");
+
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            getConfig().set("offline_inventory." + player.getUniqueId(), playerHasMace(player));
+        }
+
+        saveConfig();
+        getLogger().info("[OneMace] Plugin disabled!");
+    }
 
     public void markConfigDirty() {
         if (configDirty) return;
@@ -83,7 +130,6 @@ public class OneMace extends JavaPlugin implements Listener {
             getConfig().set("messages.lost", "&b[OneMace] &eThe Mace has been lost!");
             changed = true;
         }
-
         if (!getConfig().contains("settings.allow-locate-for-all")) {
             getConfig().set("settings.allow-locate-for-all", false);
             changed = true;
@@ -96,25 +142,13 @@ public class OneMace extends JavaPlugin implements Listener {
             getConfig().set("settings.mace-name-color", "RED");
             changed = true;
         }
-
         if (!getConfig().contains("settings.optional-allowed-containers")) {
             getConfig().set("settings.optional-allowed-containers", Arrays.asList("ENDER_CHEST", "ANVIL", "ENCHANTING"));
             changed = true;
         }
 
-        if (changed) {
-            markConfigDirty();
-        }
+        if (changed) markConfigDirty();
     }
-
-    private final Set<InventoryType> mandatoryContainers = Set.of(
-            InventoryType.PLAYER,
-            InventoryType.CRAFTING,
-            InventoryType.WORKBENCH,
-            InventoryType.CREATIVE
-    );
-
-    private final Set<InventoryType> allowedContainers = new HashSet<>();
 
     public void loadAllowedContainers() {
         allowedContainers.clear();
@@ -122,576 +156,113 @@ public class OneMace extends JavaPlugin implements Listener {
 
         List<String> containerNames = getConfig().getStringList("settings.optional-allowed-containers");
         for (String name : containerNames) {
-            try {
-                allowedContainers.add(InventoryType.valueOf(name.toUpperCase()));
-            } catch (IllegalArgumentException e) {
+            String normalized = name.toUpperCase(Locale.ROOT);
+            if (isKnownContainerName(normalized) || normalized.equals("SHELF")) {
+                allowedContainers.add(normalized);
+            } else {
                 getLogger().warning("[OneMace] Invalid optional inventory type in config: " + name);
             }
         }
     }
 
-
-    @EventHandler
-    public void onPlayerQuit(org.bukkit.event.player.PlayerQuitEvent event) {
-        Player player = event.getPlayer();
-        boolean hasMace = false;
-
-        for (ItemStack item : player.getInventory().getContents()) {
-            if (isMace(item)) {
-                hasMace = true;
-                break;
-            }
+    private boolean isKnownContainerName(String name) {
+        try {
+            InventoryType.valueOf(name);
+            return true;
+        } catch (IllegalArgumentException e) {
+            return false;
         }
+    }
 
-        for (ItemStack item : player.getEnderChest().getContents()) {
-            if (isMace(item)) {
-                hasMace = true;
-                getLogger().info("[OneMace] Player " + player.getName() + " logged out with the Mace in their Ender Chest.");
-                break;
-            }
+    private boolean isAllowedContainer(InventoryType type) {
+        return type != null && allowedContainers.contains(type.name());
+    }
+
+    private boolean isAllowedContainerName(String name) {
+        return allowedContainers.contains(name);
+    }
+
+    public boolean isMace(ItemStack item) {
+        return MaceStorageUtil.isMace(item);
+    }
+
+    public boolean containsMace(ItemStack item) {
+        return MaceStorageUtil.containsMace(item);
+    }
+
+    public boolean containsMace(Inventory inventory) {
+        return MaceStorageUtil.containsMace(inventory);
+    }
+
+    public boolean isMaceCrafted() {
+        return maceCrafted;
+    }
+
+    public boolean hasOfflineMaceRecord() {
+        if (!getConfig().isConfigurationSection("offline_inventory")) return false;
+
+        for (String uuid : Objects.requireNonNull(getConfig().getConfigurationSection("offline_inventory")).getKeys(false)) {
+            if (getConfig().getBoolean("offline_inventory." + uuid, false)) return true;
         }
+        return false;
+    }
 
-        if (isMaceOwner(player.getUniqueId())) {
-            saveMaceOwner(null);
-        }
+    public void markMace(ItemStack mace) {
+        if (!isMace(mace)) return;
 
-        getConfig().set("offline_inventory." + player.getUniqueId(), hasMace);
+        ItemMeta meta = mace.getItemMeta();
+        if (meta == null) return;
+
+        PersistentDataContainer data = meta.getPersistentDataContainer();
+        data.set(maceKey, PersistentDataType.STRING, "true");
+        mace.setItemMeta(meta);
+    }
+
+    public void lockMaceCrafting() {
+        maceCrafted = true;
+        getConfig().set("settings.mace-crafted", true);
         markConfigDirty();
-    }
-
-    @EventHandler
-    public void onPlayerDeath(PlayerDeathEvent event) {
-        for (ItemStack drop : event.getDrops()) {
-            if (isMace(drop)) {
-                saveMaceOwner(null);
-                break;
-            }
-        }
-    }
-
-    @Override
-    public void onDisable() {
-        getLogger().info("[OneMace] Saving Ender Chest data before shutdown...");
-
-        for (Player player : Bukkit.getOnlinePlayers()) {
-            boolean hasMace = false;
-
-            for (ItemStack item : player.getInventory().getContents()) {
-                if (isMace(item)) {
-                    hasMace = true;
-                    break;
-                }
-            }
-
-            for (ItemStack item : player.getEnderChest().getContents()) {
-                if (isMace(item)) {
-                    hasMace = true;
-                    getLogger().info("[OneMace] Player " + player.getName() + " had the Mace in their Ender Chest before shutdown.");
-                    break;
-                }
-            }
-
-            getConfig().set("offline_inventory." + player.getUniqueId(), hasMace);
-        }
-
-        saveConfig();
-        getLogger().info("[OneMace] Plugin disabled! Ender Chest data saved.");
+        removeAllMaceRecipes();
     }
 
     public void removeAllMaceRecipes() {
         NamespacedKey vanillaMaceKey = NamespacedKey.minecraft("mace");
         if (Bukkit.getRecipe(vanillaMaceKey) != null) {
             Bukkit.removeRecipe(vanillaMaceKey);
-            getLogger().info("[OneMace] Removed vanilla Mace recipe.");
         }
-    }
 
-    private boolean isAllowedContainer(InventoryType type) {
-        return allowedContainers.contains(type);
-    }
-
-    @EventHandler
-    public void onMaceDrop(org.bukkit.event.player.PlayerDropItemEvent event) {
-        Player player = event.getPlayer();
-        Item droppedItem = event.getItemDrop();
-        if (isMace(droppedItem.getItemStack())) {
-            saveMaceOwner(null);
-            getLogger().info("[OneMace] Mace ownership cleared due to drop.");
-
-            getConfig().set("offline_inventory." + player.getUniqueId(), false);
-            markConfigDirty();
-        }
-    }
-
-    @EventHandler
-    public void onMacePickup(org.bukkit.event.entity.EntityPickupItemEvent event) {
-        ItemStack pickedItem = event.getItem().getItemStack();
-
-        if (isMace(pickedItem)) {
-            if (!maceCrafted) {
-                maceCrafted = true;
-                getConfig().set("settings.mace-crafted", true);
-                markConfigDirty();
-                removeAllMaceRecipes();
-                getLogger().info("[OneMace] Mace picked up - ensuring recipe is removed.");
-            }
-
-            if (event.getEntity() instanceof Player) {
-                saveMaceOwner(event.getEntity().getUniqueId());
-            }
-            else {
-                saveMaceOwner(null);
+        for (int i = 0; i < 3; i++) {
+            NamespacedKey key = new NamespacedKey(this, "mace-variant-" + i);
+            if (Bukkit.getRecipe(key) != null) {
+                Bukkit.removeRecipe(key);
             }
         }
-    }
-
-    @EventHandler
-    public void onMaceMove(InventoryClickEvent event) {
-        if (!(event.getWhoClicked() instanceof Player player)) return;
-
-        ItemStack cursor = event.getCursor();
-        ItemStack clicked = event.getCurrentItem();
-
-        boolean cursorMace = isMace(cursor);
-        boolean clickedMace = isMace(clicked);
-
-        if (!cursorMace && !clickedMace) {
-            if (event.getClick() == ClickType.NUMBER_KEY) {
-                ItemStack hotbarItem = player.getInventory().getItem(event.getHotbarButton());
-                if (isMace(hotbarItem)) {
-                    cursorMace = true;
-                }
-            }
-
-            if (event.getClick() == ClickType.SWAP_OFFHAND) {
-                ItemStack offhandItem = player.getInventory().getItemInOffHand();
-                if (isMace(offhandItem)) {
-                    cursorMace = true;
-                }
-            }
-            if (!cursorMace && !clickedMace) return;
-        }
-
-        Inventory topInventory = event.getView().getTopInventory();
-        Inventory bottomInventory = event.getView().getBottomInventory();
-
-        if (!isAllowedContainer(topInventory.getType()) && topInventory.getType() != InventoryType.CRAFTING) {
-            boolean shouldCancel = false;
-
-            switch (event.getClick()) {
-                case LEFT:
-                case RIGHT:
-                case MIDDLE:
-                case CREATIVE:
-                    if (cursorMace && event.getClickedInventory() == topInventory) {
-                        shouldCancel = true;
-                    } else if (clickedMace && event.getClickedInventory() == topInventory) {
-                        if (cursor == null || cursor.getType() == Material.AIR) {
-                        } else {
-                            shouldCancel = true;
-                        }
-                    }
-                    break;
-
-                case SHIFT_LEFT:
-                case SHIFT_RIGHT:
-                    if (clickedMace && event.getClickedInventory() == bottomInventory) {
-                        shouldCancel = true;
-                    } else if (clickedMace && event.getClickedInventory() == topInventory) {
-                    }
-                    break;
-
-                case NUMBER_KEY:
-                    ItemStack hotbarItem = player.getInventory().getItem(event.getHotbarButton());
-                    if (isMace(hotbarItem)) {
-                        if (event.getClickedInventory() == topInventory) {
-                            shouldCancel = true;
-                        }
-                    } else if (clickedMace) {
-                        if (event.getClickedInventory() == topInventory) {
-                        }
-                    }
-                    break;
-
-                case SWAP_OFFHAND:
-                    ItemStack offhandItem = player.getInventory().getItemInOffHand();
-                    if (isMace(offhandItem)) {
-                        if (event.getClickedInventory() == topInventory) {
-                            shouldCancel = true;
-                        }
-                    } else if (clickedMace) {
-                        if (event.getClickedInventory() == topInventory) {
-                        }
-                    }
-                    break;
-
-                case DROP:
-                case CONTROL_DROP:
-                    if (clickedMace && event.getClickedInventory() == topInventory) {
-                        shouldCancel = true;
-                    }
-                    break;
-
-                case WINDOW_BORDER_LEFT:
-                case WINDOW_BORDER_RIGHT:
-                    shouldCancel = true;
-                    break;
-
-                default:
-                    if (cursorMace || clickedMace) {
-                        shouldCancel = true;
-                    }
-            }
-
-            if (shouldCancel) {
-                event.setCancelled(true);
-                player.updateInventory();
-                return;
-            }
-        }
-        Inventory targetInv = null;
-
-        switch (event.getClick()) {
-            case NUMBER_KEY:
-                if (isMace(player.getInventory().getItem(event.getHotbarButton()))) {
-                    targetInv = event.getClickedInventory();
-                } else if (clickedMace) {
-                    targetInv = player.getInventory();
-                }
-                break;
-
-            case SWAP_OFFHAND:
-                if (isMace(player.getInventory().getItemInOffHand())) {
-                    targetInv = event.getClickedInventory();
-                } else if (clickedMace) {
-                    targetInv = player.getInventory();
-                }
-                break;
-
-            case SHIFT_LEFT:
-            case SHIFT_RIGHT:
-                if (clickedMace) {
-                    targetInv = (event.getClickedInventory() == event.getView().getTopInventory())
-                            ? event.getView().getBottomInventory()
-                            : event.getView().getTopInventory();
-                }
-                break;
-
-            default:
-                if (cursorMace) {
-                    targetInv = event.getClickedInventory();
-                } else if (clickedMace && (cursor == null || cursor.getType() == Material.AIR)) {
-                }
-        }
-
-        if (targetInv != null) {
-            if (targetInv.getType() == InventoryType.PLAYER) {
-                saveMaceOwner(player.getUniqueId());
-            } else if (isAllowedContainer(targetInv.getType())) {
-                saveMaceOwner(null);
-            }
-        }
-    }
-
-    @EventHandler(priority = EventPriority.MONITOR)
-    public void onPlayerJoin(org.bukkit.event.player.PlayerJoinEvent event) {
-        UUID playerUUID = event.getPlayer().getUniqueId();
-
-        Bukkit.getScheduler().runTaskLater(this, () -> {
-            if (!Bukkit.getPlayer(playerUUID).isOnline()) return;
-
-            getConfig().set("offline_inventory." + playerUUID, null);
-            markConfigDirty();
-
-            if (isMaceOwner(playerUUID)) {
-                updateMaceNameColor(playerUUID);
-            }
-        }, 2L);
-    }
-
-    public void markMace(ItemStack mace) {
-        ItemMeta meta = mace.getItemMeta();
-        if (meta != null) {
-            PersistentDataContainer data = meta.getPersistentDataContainer();
-            data.set(maceKey, PersistentDataType.STRING, "true");
-            mace.setItemMeta(meta);
-        }
-    }
-
-    public boolean isMace(ItemStack item) {
-        try {
-            if (item == null || item.getType() != Material.MACE || !item.hasItemMeta()) {
-                return false;
-            }
-            ItemMeta meta = item.getItemMeta();
-            PersistentDataContainer data = meta.getPersistentDataContainer();
-            return data.has(maceKey, PersistentDataType.STRING);
-        } catch (Exception e) {
-            return false;
-        }
-    }
-
-    @EventHandler
-    public void onPrepareCraft(PrepareItemCraftEvent event) {
-        if (event.getRecipe() != null && event.getRecipe().getResult().getType() == Material.MACE) {
-            if (maceCrafted) {
-                event.getInventory().setResult(null);
-            }
-        }
-    }
-
-    @EventHandler
-    public void onCraft(CraftItemEvent event) {
-        if (event.getRecipe() != null && event.getRecipe().getResult().getType() == Material.MACE) {
-            if (maceCrafted || !fullMaceAudit()) {
-                event.setCancelled(true);
-                getLogger().warning("[OneMace] Prevented duplicate mace craft - mace already exists!");
-                return;
-            }
-
-            maceCrafted = true;
-            getConfig().set("settings.mace-crafted", true);
-            saveMaceOwner(event.getWhoClicked().getUniqueId());
-            markConfigDirty();
-
-            ItemStack mace = event.getInventory().getResult();
-            if (mace != null) {
-                markMace(mace);
-            }
-
-
-            Bukkit.getScheduler().runTask(this, this::removeAllMaceRecipes);
-            getLogger().info("[OneMace] Mace crafted! Removing recipe.");
-
-            if (getConfig().getBoolean("settings.announce-mace-messages", true)) {
-                String craftedMessage = getConfig().getString("messages.crafted", "&b[OneMace] The Mace has been crafted!");
-                Bukkit.broadcastMessage(ChatColor.translateAlternateColorCodes('&', craftedMessage));
-            }
-        }
-    }
-
-    @EventHandler
-    public void onCrafterCraft(CrafterCraftEvent event) {
-        if (event.getRecipe().getResult().getType() == Material.MACE) {
-            event.setCancelled(true);
-        }
-    }
-
-    private boolean fullMaceAudit() {
-        getLogger().info("[OneMace] Checking if Mace exists...");
-
-        Player[] onlinePlayers = Bukkit.getOnlinePlayers().toArray(new Player[0]);
-        for (Player player : onlinePlayers) {
-            if (!player.isOnline()) continue;
-
-            try {
-                ItemStack[] contents = player.getInventory().getContents();
-                if (contents != null) {
-                    for (ItemStack item : contents) {
-                        if (isMace(item) || isMaceInsideShulker(item) || isMaceInsideBundle(item)) {
-                            getLogger().info("[OneMace] Mace found in " + player.getName() + "'s inventory.");
-                            return false;
-                        }
-                    }
-                }
-
-                contents = player.getEnderChest().getContents();
-                if (contents != null) {
-                    for (ItemStack item : contents) {
-                        if (isMace(item) || isMaceInsideShulker(item) || isMaceInsideBundle(item)) {
-                            getLogger().info("[OneMace] Mace found in " + player.getName() + "'s Ender Chest.");
-                            return false;
-                        }
-                    }
-                }
-            } catch (Exception e) {
-                getLogger().warning("[OneMace] Skipped audit for " + player.getName() + " (inventory not fully loaded).");
-            }
-        }
-
-        for (World world : Bukkit.getWorlds()) {
-            for (Entity entity : world.getEntities()) {
-                if (entity instanceof Item item && (isMace(item.getItemStack()) || isMaceInsideShulker(item.getItemStack()))) {
-                    getLogger().info("[OneMace] Mace found as a dropped item in world: " + world.getName());
-                    return false;
-                }
-            }
-        }
-
-        for (World world : Bukkit.getWorlds()) {
-            for (Chunk chunk : world.getLoadedChunks()) {
-                for (BlockState state : chunk.getTileEntities()) {
-                    if (state instanceof Container container) {
-                        Inventory inv = container.getInventory();
-                        for (ItemStack item : inv.getContents()) {
-                            if (isMace(item) || isMaceInsideShulker(item) || isMaceInsideBundle(item)) {
-                                getLogger().info("[OneMace] Mace found inside a container at " + state.getLocation());
-                                return false;
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        for (World world : Bukkit.getWorlds()) {
-            for (Entity entity : world.getEntities()) {
-                if (entity instanceof AbstractHorse horse) {
-                    for (ItemStack item : horse.getInventory().getContents()) {
-                        if (isMace(item) || isMaceInsideShulker(item) || isMaceInsideBundle(item)) {
-                            getLogger().info("[OneMace] Mace found in a horse inventory!");
-                            return false;
-                        }
-                    }
-                }
-                if (entity instanceof StorageMinecart minecart) {
-                    for (ItemStack item : minecart.getInventory().getContents()) {
-                        if (isMace(item) || isMaceInsideShulker(item) || isMaceInsideBundle(item)) {
-                            getLogger().info("[OneMace] Mace found in a storage minecart!");
-                            return false;
-                        }
-                    }
-                }
-                if (entity instanceof ChestBoat chestBoat) {
-                    for (ItemStack item : chestBoat.getInventory().getContents()) {
-                        if (isMace(item) || isMaceInsideShulker(item) || isMaceInsideBundle(item)) {
-                            getLogger().info("[OneMace] Mace found in a Chest Boat at " +
-                                    "X: " + entity.getLocation().getBlockX() +
-                                    " Y: " + entity.getLocation().getBlockY() +
-                                    " Z: " + entity.getLocation().getBlockZ() +
-                                    " in world " + entity.getWorld().getName());
-                            return false;
-                        }
-                    }
-                }
-            }
-        }
-
-        if (getConfig().isConfigurationSection("offline_inventory")) {
-            for (String uuid : getConfig().getConfigurationSection("offline_inventory").getKeys(true)) {
-                if (getConfig().getBoolean("offline_inventory." + uuid, false)) {
-                    getLogger().info("[OneMace] Mace is in an offline player's inventory (UUID: " + uuid + ").");
-                    return false;
-                }
-            }
-        }
-
-        getLogger().info("[OneMace] Mace does not exist! Crafting can be re-enabled.");
-
-        getConfig().set("offline_inventory", null);
-        markConfigDirty();
-        return true;
-    }
-
-    private boolean isMaceInsideShulker(ItemStack item) {
-        if (item == null || item.getType() != Material.SHULKER_BOX) {
-            return false;
-        }
-
-        BlockStateMeta meta = (BlockStateMeta) item.getItemMeta();
-        if (meta == null || !(meta.getBlockState() instanceof ShulkerBox shulkerBox)) {
-            return false;
-        }
-
-        Inventory shulkerInv = shulkerBox.getInventory();
-        for (ItemStack storedItem : shulkerInv.getContents()) {
-            if (isMace(storedItem) || isMaceInsideShulker(storedItem)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private boolean isMaceInsideBundle(ItemStack item) {
-        if (item == null || !(item.getItemMeta() instanceof org.bukkit.inventory.meta.BundleMeta bundleMeta)) {
-            return false;
-        }
-        for (ItemStack stored : bundleMeta.getItems()) {
-            if (isMace(stored) || isMaceInsideShulker(stored) || isMaceInsideBundle(stored)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private void updateMaceNameColor(UUID ownerUUID) {
-        if (!getConfig().getBoolean("settings.colored-name", true)) {
-            return;
-        }
-
-        Scoreboard board = Bukkit.getScoreboardManager().getMainScoreboard();
-        Team maceTeam = board.getTeam("maceHolder");
-        if (maceTeam == null) {
-            maceTeam = board.registerNewTeam("maceHolder");
-        }
-
-        maceTeam.getEntries().forEach(maceTeam::removeEntry);
-
-        if (ownerUUID != null) {
-            Player player = Bukkit.getPlayer(ownerUUID);
-            if (player != null) {
-                String colorName = getConfig().getString("settings.mace-name-color", "RED").toUpperCase();
-                try {
-                    ChatColor color = ChatColor.valueOf(colorName);
-                    maceTeam.setColor(color);
-                } catch (IllegalArgumentException e) {
-                    maceTeam.setColor(ChatColor.RED);
-                }
-
-                maceTeam.addEntry(player.getName());
-            }
-        }
-    }
-
-    public void saveMaceOwner(UUID ownerUUID) {
-        if (ownerUUID == null) {
-            getConfig().set("settings.mace-owner", null);
-        } else {
-            getConfig().set("settings.mace-owner", ownerUUID.toString());
-        }
-        markConfigDirty();
-
-        updateMaceNameColor(ownerUUID);
-    }
-
-    public UUID getMaceOwner() {
-        String ownerUUID = getConfig().getString("settings.mace-owner");
-        return (ownerUUID != null) ? UUID.fromString(ownerUUID) : null;
-    }
-
-    public boolean isMaceOwner(UUID playerUUID) {
-        UUID maceOwner = getMaceOwner();
-        return maceOwner != null && maceOwner.equals(playerUUID);
     }
 
     public void resetMaceCrafting(boolean announce) {
-        if (!maceCrafted) return;
+        boolean wasCrafted = maceCrafted;
 
         maceCrafted = false;
         getConfig().set("settings.mace-crafted", false);
         getConfig().set("offline_inventory", null);
         markConfigDirty();
+        ensureMaceRecipeAvailable();
 
-        addVanillaMaceRecipe();
+        if (wasCrafted) {
+            getLogger().info("[OneMace] No Mace found. Crafting is re-enabled.");
+        }
 
-        getLogger().info("[OneMace] No Mace found. Crafting is re-enabled.");
-
-        if (announce && getConfig().getBoolean("settings.announce-mace-messages", true)) {
+        if (wasCrafted && announce && getConfig().getBoolean("settings.announce-mace-messages", true)) {
             String lostMessage = getConfig().getString("messages.lost", "&b[OneMace] The Mace has been lost!");
             Bukkit.broadcastMessage(ChatColor.translateAlternateColorCodes('&', lostMessage));
         }
     }
 
-    private void addVanillaMaceRecipe() {
-        NamespacedKey firstVariant = new NamespacedKey(this, "mace-variant-0");
-        if (Bukkit.getRecipe(firstVariant) != null) {
-            getLogger().fine("[OneMace] Mace recipes already registered, skipping.");
-            return;
-        }
+    private void ensureMaceRecipeAvailable() {
+        if (Bukkit.getRecipe(NamespacedKey.minecraft("mace")) != null) return;
 
-        NamespacedKey vanillaMaceKey = NamespacedKey.minecraft("mace");
-        if (Bukkit.getRecipe(vanillaMaceKey) != null) {
-            Bukkit.removeRecipe(vanillaMaceKey);
+        for (int i = 0; i < 3; i++) {
+            if (Bukkit.getRecipe(new NamespacedKey(this, "mace-variant-" + i)) != null) return;
         }
 
         String[][] variants = {
@@ -713,140 +284,415 @@ public class OneMace extends JavaPlugin implements Listener {
     }
 
     @EventHandler
-    public void onMaceBreak(PlayerItemBreakEvent event) {
-        ItemStack brokenItem = event.getBrokenItem();
-        if (isMace(brokenItem)) {
-            Bukkit.getScheduler().runTaskLater(this, () -> {
-                if (fullMaceAudit()) {
-                    resetMaceCrafting(true);
-                }
-            }, 50L);
+    public void onPlayerQuit(PlayerQuitEvent event) {
+        Player player = event.getPlayer();
+
+        if (isMaceOwner(player.getUniqueId())) {
+            saveMaceOwner(null);
         }
+
+        getConfig().set("offline_inventory." + player.getUniqueId(), playerHasMace(player));
+        markConfigDirty();
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onPlayerJoin(PlayerJoinEvent event) {
+        UUID playerUUID = event.getPlayer().getUniqueId();
+
+        Bukkit.getScheduler().runTaskLater(this, () -> {
+            Player player = Bukkit.getPlayer(playerUUID);
+            if (player == null || !player.isOnline()) return;
+
+            getConfig().set("offline_inventory." + playerUUID, null);
+            markConfigDirty();
+
+            if (isMaceOwner(playerUUID)) {
+                updateMaceNameColor(playerUUID);
+            }
+        }, 2L);
+    }
+
+    private boolean playerHasMace(Player player) {
+        return containsMace(player.getInventory()) || containsMace(player.getEnderChest());
     }
 
     @EventHandler
-    public void onItemDespawn(ItemDespawnEvent event) {
-        if (isMace(event.getEntity().getItemStack())) {
-            Bukkit.getScheduler().runTaskLater(this, () -> {
-                if (fullMaceAudit()) {
-                    resetMaceCrafting(true);
-                }
-            }, 50L);
-        }
-    }
-
-    @EventHandler
-    public void onItemRemoved(EntityRemoveFromWorldEvent event) {
-        if (event.getEntity() instanceof Item item) {
-            if (isMace(item.getItemStack())) {
-                Bukkit.getScheduler().runTaskLater(this, () -> {
-                    if (fullMaceAudit()) {
-                        resetMaceCrafting(true);
-                    }
-                }, 50L);
+    public void onPlayerDeath(PlayerDeathEvent event) {
+        for (ItemStack drop : event.getDrops()) {
+            if (containsMace(drop)) {
+                saveMaceOwner(null);
+                break;
             }
         }
     }
 
     @EventHandler
-    public void onInteract(PlayerInteractEvent event) {
-        if (event.getClickedBlock() == null) return;
+    public void onMaceDrop(PlayerDropItemEvent event) {
+        if (!containsMace(event.getItemDrop().getItemStack())) return;
+
+        saveMaceOwner(null);
+        getConfig().set("offline_inventory." + event.getPlayer().getUniqueId(), false);
+        markConfigDirty();
+    }
+
+    @EventHandler
+    public void onMacePickup(EntityPickupItemEvent event) {
+        if (!containsMace(event.getItem().getItemStack())) return;
+
+        if (!maceCrafted) {
+            lockMaceCrafting();
+            getLogger().info("[OneMace] Mace picked up - ensuring recipes are removed.");
+        }
+
+        if (event.getEntity() instanceof Player player) {
+            saveMaceOwner(player.getUniqueId());
+        } else {
+            saveMaceOwner(null);
+        }
+    }
+
+    @EventHandler
+    public void onMaceMove(InventoryClickEvent event) {
+        if (!(event.getWhoClicked() instanceof Player player)) return;
+
+        ItemStack cursor = event.getCursor();
+        ItemStack current = event.getCurrentItem();
+
+        if (blocksBundleInsertion(cursor, current)) {
+            event.setCancelled(true);
+            return;
+        }
+
+        Inventory top = event.getView().getTopInventory();
+        Inventory bottom = event.getView().getBottomInventory();
+
+        if (!isAllowedContainer(top.getType()) && isMovingMaceIntoTop(event, player, top, bottom)) {
+            event.setCancelled(true);
+            return;
+        }
+
+        Inventory target = getTargetInventory(event, player, top, bottom);
+        if (target == null) return;
+
+        if (target.getType() == InventoryType.PLAYER) {
+            saveMaceOwner(player.getUniqueId());
+        } else if (isAllowedContainer(target.getType())) {
+            saveMaceOwner(null);
+        }
+    }
+
+    private boolean blocksBundleInsertion(ItemStack cursor, ItemStack current) {
+        return (containsMace(cursor) && MaceStorageUtil.isBundle(current))
+                || (containsMace(current) && MaceStorageUtil.isBundle(cursor));
+    }
+
+    private boolean isMovingMaceIntoTop(InventoryClickEvent event, Player player, Inventory top, Inventory bottom) {
+        Inventory clickedInventory = event.getClickedInventory();
+        ItemStack current = event.getCurrentItem();
+        ItemStack cursor = event.getCursor();
+
+        return switch (event.getClick()) {
+            case SHIFT_LEFT, SHIFT_RIGHT -> clickedInventory == bottom && containsMace(current);
+            case NUMBER_KEY -> clickedInventory == top
+                    && event.getHotbarButton() >= 0
+                    && containsMace(player.getInventory().getItem(event.getHotbarButton()));
+            case SWAP_OFFHAND -> clickedInventory == top && containsMace(player.getInventory().getItemInOffHand());
+            case WINDOW_BORDER_LEFT, WINDOW_BORDER_RIGHT -> false;
+            default -> clickedInventory == top && containsMace(cursor);
+        };
+    }
+
+    private Inventory getTargetInventory(InventoryClickEvent event, Player player, Inventory top, Inventory bottom) {
+        ItemStack current = event.getCurrentItem();
+        ItemStack cursor = event.getCursor();
+
+        return switch (event.getClick()) {
+            case SHIFT_LEFT, SHIFT_RIGHT -> containsMace(current)
+                    ? (event.getClickedInventory() == top ? bottom : top)
+                    : null;
+            case NUMBER_KEY -> {
+                if (event.getHotbarButton() >= 0 && containsMace(player.getInventory().getItem(event.getHotbarButton()))) {
+                    yield event.getClickedInventory();
+                }
+                yield containsMace(current) ? player.getInventory() : null;
+            }
+            case SWAP_OFFHAND -> containsMace(player.getInventory().getItemInOffHand())
+                    ? event.getClickedInventory()
+                    : (containsMace(current) ? player.getInventory() : null);
+            default -> containsMace(cursor) ? event.getClickedInventory() : null;
+        };
+    }
+
+    @EventHandler
+    public void onMaceDrag(InventoryDragEvent event) {
+        if (!containsMace(event.getOldCursor())) return;
+
+        Inventory top = event.getView().getTopInventory();
+        if (isAllowedContainer(top.getType())) return;
+
+        int topSize = top.getSize();
+        for (int rawSlot : event.getRawSlots()) {
+            if (rawSlot < topSize) {
+                event.setCancelled(true);
+                return;
+            }
+        }
+    }
+
+    @EventHandler
+    public void onPrepareCraft(PrepareItemCraftEvent event) {
+        if (event.getRecipe() != null
+                && event.getRecipe().getResult().getType() == Material.MACE
+                && maceCrafted) {
+            event.getInventory().setResult(null);
+        }
+    }
+
+    @EventHandler
+    public void onCraft(CraftItemEvent event) {
+        if (event.getRecipe() == null || event.getRecipe().getResult().getType() != Material.MACE) return;
+
+        if (maceCrafted || hasKnownMace()) {
+            event.setCancelled(true);
+            getLogger().warning("[OneMace] Prevented duplicate Mace craft - a Mace already exists.");
+            return;
+        }
+
+        if (event.isShiftClick()) {
+            event.setCancelled(true);
+            event.getWhoClicked().sendMessage(ChatColor.YELLOW + "Craft the Mace with a normal click to prevent bulk crafting.");
+            return;
+        }
+
+        maceCrafted = true;
+        getConfig().set("settings.mace-crafted", true);
+        saveMaceOwner(event.getWhoClicked().getUniqueId());
+        markConfigDirty();
+
+        ItemStack result = event.getInventory().getResult();
+        if (result != null) markMace(result);
+
+        Bukkit.getScheduler().runTask(this, this::removeAllMaceRecipes);
+        getLogger().info("[OneMace] Mace crafted! Removing recipes.");
+
+        if (getConfig().getBoolean("settings.announce-mace-messages", true)) {
+            String craftedMessage = getConfig().getString("messages.crafted", "&b[OneMace] The Mace has been crafted!");
+            Bukkit.broadcastMessage(ChatColor.translateAlternateColorCodes('&', craftedMessage));
+        }
+    }
+
+    @EventHandler
+    public void onCrafterCraft(CrafterCraftEvent event) {
+        if (event.getRecipe().getResult().getType() == Material.MACE) {
+            event.setCancelled(true);
+        }
+    }
+
+    public boolean hasKnownMace() {
+        getLogger().info("[OneMace] Checking if a Mace exists...");
+
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            if (playerHasMace(player)) {
+                getLogger().info("[OneMace] Mace found in " + player.getName() + "'s inventory or Ender Chest.");
+                return true;
+            }
+        }
+
+        for (World world : Bukkit.getWorlds()) {
+            for (Entity entity : world.getEntities()) {
+                if (entity instanceof Item item && containsMace(item.getItemStack())) {
+                    getLogger().info("[OneMace] Mace found as a dropped item in world " + world.getName() + ".");
+                    return true;
+                }
+
+                if (entity instanceof ItemFrame itemFrame && containsMace(itemFrame.getItem())) {
+                    getLogger().info("[OneMace] Mace found in an item frame at " + itemFrame.getLocation() + ".");
+                    return true;
+                }
+
+                if (entity instanceof InventoryHolder holder && containsMace(holder.getInventory())) {
+                    getLogger().info("[OneMace] Mace found in an entity inventory in world " + world.getName() + ".");
+                    return true;
+                }
+
+                if (entity instanceof LivingEntity living && living.getEquipment() != null) {
+                    EntityEquipment equipment = living.getEquipment();
+                    if (containsMace(equipment.getItemInMainHand()) || containsMace(equipment.getItemInOffHand())) {
+                        getLogger().info("[OneMace] Mace found in an entity's equipment in world " + world.getName() + ".");
+                        return true;
+                    }
+                }
+            }
+
+            for (Chunk chunk : world.getLoadedChunks()) {
+                for (BlockState state : chunk.getTileEntities()) {
+                    if (state instanceof InventoryHolder holder && containsMace(holder.getInventory())) {
+                        getLogger().info("[OneMace] Mace found inside a block inventory at " + state.getLocation() + ".");
+                        return true;
+                    }
+                }
+            }
+        }
+
+        if (hasOfflineMaceRecord()) {
+            getLogger().info("[OneMace] Mace is recorded in an offline player's inventory.");
+            return true;
+        }
+
+        getLogger().info("[OneMace] No known Mace found.");
+        return false;
+    }
+
+    @EventHandler
+    public void onMaceBreak(PlayerItemBreakEvent event) {
+        if (isMace(event.getBrokenItem())) {
+            scheduleLossAudit();
+        }
+    }
+
+    @EventHandler
+    public void onItemDespawn(ItemDespawnEvent event) {
+        if (containsMace(event.getEntity().getItemStack())) {
+            scheduleLossAudit();
+        }
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onDroppedMaceDamage(EntityDamageEvent event) {
+        if (!(event.getEntity() instanceof Item item) || !containsMace(item.getItemStack())) return;
+
+        Bukkit.getScheduler().runTaskLater(this, () -> {
+            if (!hasKnownMace()) {
+                resetMaceCrafting(true);
+            }
+        }, 2L);
+    }
+
+    @EventHandler
+    public void onItemRemoved(EntityRemoveFromWorldEvent event) {
+        if (!(event.getEntity() instanceof Item item) || !containsMace(item.getItemStack())) return;
+        if (!PaperCompat.isDestructiveRemoval(item)) return;
+
+        scheduleLossAudit();
+    }
+
+    private void scheduleLossAudit() {
+        Bukkit.getScheduler().runTaskLater(this, () -> {
+            if (!hasKnownMace()) {
+                resetMaceCrafting(true);
+            }
+        }, 50L);
+    }
+
+    @EventHandler
+    public void onDirectBlockStorage(PlayerInteractEvent event) {
+        if (event.getAction() != Action.RIGHT_CLICK_BLOCK) return;
 
         Block block = event.getClickedBlock();
-        Player player = event.getPlayer();
-        ItemStack item = player.getInventory().getItemInMainHand();
+        if (block == null || !containsMace(event.getItem())) return;
 
-        if (item == null || item.getType() != Material.MACE) return;
+        if (block.getType() == Material.DECORATED_POT && !isAllowedContainer(InventoryType.DECORATED_POT)) {
+            event.setCancelled(true);
+            return;
+        }
 
-        if (block.getType() == Material.DECORATED_POT) {
+        if (MaceStorageUtil.isShelf(block.getType()) && !isAllowedContainerName("SHELF")) {
             event.setCancelled(true);
         }
     }
 
     @EventHandler
-    public void onInteractEntity(PlayerInteractEntityEvent event) {
-        if (!(event.getRightClicked() instanceof ItemFrame)) return;
+    public void onBundleUse(PlayerInteractEvent event) {
+        if (event.getAction() != Action.RIGHT_CLICK_AIR && event.getAction() != Action.RIGHT_CLICK_BLOCK) return;
 
         Player player = event.getPlayer();
+        ItemStack mainHand = player.getInventory().getItemInMainHand();
+        ItemStack offHand = player.getInventory().getItemInOffHand();
 
-        ItemStack main = player.getInventory().getItemInMainHand();
-        ItemStack off = player.getInventory().getItemInOffHand();
-
-        if (isMace(main) || isMace(off)) {
+        if ((containsMace(mainHand) && MaceStorageUtil.isBundle(offHand))
+                || (containsMace(offHand) && MaceStorageUtil.isBundle(mainHand))) {
             event.setCancelled(true);
-            player.updateInventory();
+        }
+    }
+
+    @EventHandler
+    public void onItemFrameChange(PlayerItemFrameChangeEvent event) {
+        if (event.getAction() == PlayerItemFrameChangeEvent.ItemFrameChangeAction.PLACE
+                && containsMace(event.getItemStack())) {
+            event.setCancelled(true);
         }
     }
 
     @EventHandler
     public void onArmorStandManipulate(PlayerArmorStandManipulateEvent event) {
-
-        Player player = event.getPlayer();
-
-        ItemStack main = player.getInventory().getItemInMainHand();
-        ItemStack off = player.getInventory().getItemInOffHand();
-
-        if (isMace(main) || isMace(off)) {
+        if (containsMace(event.getPlayerItem())) {
             event.setCancelled(true);
-            player.updateInventory();
         }
     }
 
     @EventHandler
     public void onHopperMove(InventoryMoveItemEvent event) {
-        ItemStack item = event.getItem();
-
-        if (isMace(item)) {
+        if (containsMace(event.getItem())) {
             event.setCancelled(true);
         }
     }
 
     @EventHandler
     public void onHopperPickup(InventoryPickupItemEvent event) {
-        Item item = event.getItem();
-
-        if (isMace(item.getItemStack())) {
+        if (containsMace(event.getItem().getItemStack())) {
             event.setCancelled(true);
         }
     }
 
-    private boolean isBundle(ItemStack item) {
-        if (item == null) return false;
+    private void updateMaceNameColor(UUID ownerUUID) {
+        if (!getConfig().getBoolean("settings.colored-name", false)) return;
 
-        Material type = item.getType();
-        return type == Material.BUNDLE ||
-                type.name().endsWith("_BUNDLE");
+        Scoreboard board = Bukkit.getScoreboardManager().getMainScoreboard();
+        Team maceTeam = board.getTeam("maceHolder");
+        if (maceTeam == null) {
+            maceTeam = board.registerNewTeam("maceHolder");
+        }
+
+        for (String entry : Set.copyOf(maceTeam.getEntries())) {
+            maceTeam.removeEntry(entry);
+        }
+
+        if (ownerUUID == null) return;
+
+        Player player = Bukkit.getPlayer(ownerUUID);
+        if (player == null) return;
+
+        String colorName = getConfig().getString("settings.mace-name-color", "RED").toUpperCase(Locale.ROOT);
+        try {
+            maceTeam.setColor(ChatColor.valueOf(colorName));
+        } catch (IllegalArgumentException e) {
+            maceTeam.setColor(ChatColor.RED);
+        }
+        maceTeam.addEntry(player.getName());
     }
 
-    @EventHandler
-    public void onBundleUse(PlayerInteractEvent event) {
-        Player player = event.getPlayer();
-        ItemStack mainHand = player.getInventory().getItemInMainHand();
-        ItemStack offHand = player.getInventory().getItemInOffHand();
-        ItemStack usedItem = event.getItem();
+    public void saveMaceOwner(UUID ownerUUID) {
+        getConfig().set("settings.mace-owner", ownerUUID == null ? null : ownerUUID.toString());
+        markConfigDirty();
+        updateMaceNameColor(ownerUUID);
+    }
 
-        if (isMace(mainHand)) {
-            if (isBundle(usedItem) || isBundle(offHand)) {
-                event.setCancelled(true);
-                player.updateInventory();
-            }
+    public UUID getMaceOwner() {
+        String ownerUUID = getConfig().getString("settings.mace-owner");
+        if (ownerUUID == null) return null;
+
+        try {
+            return UUID.fromString(ownerUUID);
+        } catch (IllegalArgumentException e) {
+            getLogger().warning("[OneMace] Invalid mace-owner UUID in config; clearing it.");
+            getConfig().set("settings.mace-owner", null);
+            markConfigDirty();
+            return null;
         }
     }
 
-    @EventHandler
-    public void onBundleMaceInventoryMove(InventoryClickEvent event) {
-        Player player = (Player) event.getWhoClicked();
-        ItemStack cursor = event.getCursor();
-        ItemStack current = event.getCurrentItem();
-
-        if (isMace(cursor) && isBundle(current)) {
-            event.setCancelled(true);
-            player.updateInventory();
-        }
-
-        if (isMace(current) && isBundle(cursor)) {
-            event.setCancelled(true);
-            player.updateInventory();
-        }
+    public boolean isMaceOwner(UUID playerUUID) {
+        UUID maceOwner = getMaceOwner();
+        return maceOwner != null && maceOwner.equals(playerUUID);
     }
 }
