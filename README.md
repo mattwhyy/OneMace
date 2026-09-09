@@ -71,10 +71,6 @@ Basic information about the plugin.
 none
 
 ## Setup
-OneMace 1.08 supports **Paper-based Minecraft servers from 1.21 through 26.2** with one plugin jar.
-
-The plugin is compiled for **Java 21**, so it can run on the Java 21 runtime used by older supported servers as well as newer Java runtimes. Use the Java version required by your Minecraft/Paper version.
-
 Put the ```jar``` file into your server's **plugins** folder.
 
 **Restart** the server.
