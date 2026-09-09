@@ -4,6 +4,7 @@ import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.BundleMeta;
+import org.bukkit.inventory.meta.ItemMeta;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -16,6 +17,7 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 class OneMaceRegressionTest {
     private Class<?> mockBukkit;
@@ -43,7 +45,7 @@ class OneMaceRegressionTest {
 
     @Test
     void findsMaceInsideBundle() {
-        ItemStack bundle = bundleWith(new ItemStack(Material.MACE));
+        ItemStack bundle = createBundleIfSupported(new ItemStack(Material.MACE));
 
         assertTrue(plugin.containsMace(bundle));
     }
@@ -60,7 +62,7 @@ class OneMaceRegressionTest {
     void duplicateCleanupPersistsInsideBundleMetadata() throws Exception {
         Player player = addPlayer();
         player.getInventory().setItem(0, new ItemStack(Material.MACE));
-        player.getInventory().setItem(1, bundleWith(new ItemStack(Material.MACE)));
+        player.getInventory().setItem(1, createBundleIfSupported(new ItemStack(Material.MACE)));
 
         MaceStorageUtil.CleanupState state = new MaceStorageUtil.CleanupState();
         MaceStorageUtil.removeExtraMaces(player.getInventory(), state);
@@ -134,9 +136,12 @@ class OneMaceRegressionTest {
         scheduler.getClass().getMethod("performOneTick").invoke(scheduler);
     }
 
-    private ItemStack bundleWith(ItemStack... contents) {
+    private ItemStack createBundleIfSupported(ItemStack... contents) {
         ItemStack bundle = new ItemStack(Material.BUNDLE);
-        BundleMeta meta = (BundleMeta) bundle.getItemMeta();
+        ItemMeta itemMeta = bundle.getItemMeta();
+        assumeTrue(itemMeta instanceof BundleMeta, "This server test harness does not implement bundle metadata");
+
+        BundleMeta meta = (BundleMeta) itemMeta;
         meta.setItems(List.of(contents));
         bundle.setItemMeta(meta);
         return bundle;
