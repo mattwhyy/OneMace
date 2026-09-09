@@ -12,6 +12,7 @@ OneMace enforces a hard limit: players can have only **one** Mace. **No** bypass
 - The plugin stores the crafted state in **config.yml**, so it remains saved across **restarts**.
 - The Mace recipe is **re-enabled** if the Mace is **destroyed** (e.g., lava, void, breaking).
 - Announcements for crafting & destruction can be enabled/disabled in **config.yml**.
+- Maces are tracked inside supported nested item storage and modern block/entity inventories.
 
 ##
 Need a **server** for a nice deal or just want to **support me**? ❤️
@@ -70,12 +71,14 @@ Basic information about the plugin.
 none
 
 ## Setup
-Put the ```jar``` file into your server's **plugin folder**.
+OneMace 1.08 targets **Paper 26.2**. Paper 26.2 requires **Java 25**.
 
-**Restart** (or reload) the server!
+Put the ```jar``` file into your server's **plugins** folder.
+
+**Restart** the server.
 
 ## Bypasses & Limitations
-⚠️ **Maces in unloaded chunks will NOT be detected. This is unfortunately unfixable due to how Minecraft works. It is up to you to detect and use the admin commands if you suspect there may be more than one Mace.**
+⚠️ **Maces in unloaded chunks cannot be scanned directly.** OneMace keeps the recipe disabled when it has evidence that a Mace still exists, including tracked offline-player inventories. `/onemace fix` will not assume an offline Mace is gone just because its player is not online.
 
 Otherwise, this plugin should work perfectly on a clean vanilla server.
 ## Contact
@@ -83,7 +86,7 @@ Otherwise, this plugin should work perfectly on a clean vanilla server.
 If you find any **vanilla bypass** or just need **help**, feel free to contact me:
 
 [![Discord Contact](https://img.shields.io/badge/Contact%20on-Discord-%235865f2?logo=discord&style=plastic&link=https%3A%2F%2Fdiscordapp.com%2Fusers%2F555629040455909406)](https://discord.com/users/555629040455909406)
-[![GitHub](https://img.shields.io/badge/Contact%20on-GitHub-green?logo=github&style=plastic&link=left-https%3A%2F%2Fgithub.com%2Fmattwhyy%2FOneMace%2Fissues
+[![GitHub](https://img.shields.io/badge/Contact%20on-GitHub-green?style=plastic&logo=github&link=left-https%3A%2F%2Fgithub.com%2Fmattwhyy%2FOneMace%2Fissues
 )](https://github.com/mattwhyy/OneMace/issues)
 
 ## Special Thanks
