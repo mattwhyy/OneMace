@@ -1,12 +1,16 @@
-name: onemace
+name: OneMace
 version: '${version}'
 main: net.mattwhyy.onemace.OneMace
-api-version: '26.2'
+api-version: '1.21'
+authors: [mattwhyy]
+description: Limits the number of Maces to only one!
+website: https://modrinth.com/plugin/onemace
 commands:
   onemace:
-    description: Main command for OneMace
-    usage: /onemace <subcommand>
+    description: OneMace administration command
+    usage: /onemace <locate|fix|reload>
+    permission: onemace.admin
 permissions:
   onemace.admin:
-    description: Allows using OneMace admin subcommands
+    description: Allows use of OneMace administration commands
     default: op
