@@ -3,40 +3,38 @@ plugins {
 }
 
 group = 'net.mattwhyy'
-version = '1.07'
+version = '1.08'
 
 repositories {
     mavenCentral()
     maven {
-        name = "papermc"
-        url = "https://repo.papermc.io/repository/maven-public/"
-    }
-    maven {
-        name = "sonatype"
-        url = "https://oss.sonatype.org/content/groups/public/"
+        name = 'papermc'
+        url = 'https://repo.papermc.io/repository/maven-public/'
     }
 }
 
 dependencies {
-    compileOnly('io.papermc.paper:paper-api:1.21-R0.1-SNAPSHOT')
+    compileOnly('io.papermc.paper:paper-api:26.2.build.121-stable')
+
+    testImplementation('org.junit.jupiter:junit-jupiter:5.13.4')
+    testImplementation('org.mockbukkit.mockbukkit:mockbukkit-v26.2:4.116.1')
 }
 
-def targetJavaVersion = 21
+def targetJavaVersion = 25
 java {
     def javaVersion = JavaVersion.toVersion(targetJavaVersion)
     sourceCompatibility = javaVersion
     targetCompatibility = javaVersion
-    if (JavaVersion.current() < javaVersion) {
-        toolchain.languageVersion = JavaLanguageVersion.of(targetJavaVersion)
-    }
+    toolchain.languageVersion = JavaLanguageVersion.of(targetJavaVersion)
 }
 
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
+    options.release.set(targetJavaVersion)
+}
 
-    if (targetJavaVersion >= 10 || JavaVersion.current().isJava10Compatible()) {
-        options.release.set(targetJavaVersion)
-    }
+test {
+    useJUnitPlatform()
 }
 
 processResources {
